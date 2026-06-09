@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>arXiv Reader</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #7c6af7;
+    --accent2: #4ecdc4;
+    --text: #e8e8f0;
+    --text-dim: #7070a0;
+    --danger: #f74c6a;
+    --success: #4ecdc4;
+    --mono: 'Space Mono', monospace;
+    --sans: 'Noto Sans JP', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 0 100px 0;
+  }
+
+  /* Header */
+  .header {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+
+  .logo span { color: var(--accent2); }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .status-dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+  .status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+  }
+
+  .tab {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 12px 16px 10px;
+    cursor: pointer;
+    color: var(--text-dim);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Panels */
+  .panel { display: none; padding: 16px; }
+  .panel.active { display: block; }
+
+  /* Section label */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  /* Input */
+  .input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent); }
+  input[type="text"]::placeholder { color: var(--text-dim); }
+
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { filter: brightness(1.15); }
+  .btn:active { transform: scale(0.97); }
+  .btn.secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn.danger { background: var(--danger); }
+  .btn.small { padding: 6px 12px; font-size: 11px; }
+  .btn.icon-btn {
+    padding: 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+  }
+
+  /* Keyword tags */
+  .keyword-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .keyword-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 12px 5px 14px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+  }
+
+  .keyword-tag .remove {
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+
+  .keyword-tag .remove:hover { color: var(--danger); }
+
+  /* Search results */
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .result-card:hover { border-color: var(--accent); }
+  .result-card.selected { border-color: var(--accent2); }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+
+  .card-authors {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-abstract {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-abstract.expanded {
+    display: block;
+    -webkit-line-clamp: unset;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(124,106,247,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(124,106,247,0.3);
+  }
+
+  .date-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  /* Speaking indicator */
+  .speaking-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(78,205,196,0.1);
+    border: 1px solid rgba(78,205,196,0.3);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+  }
+
+  .speaking-bar.visible { display: flex; }
+
+  .wave {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+
+  .wave-bar {
+    width: 3px;
+    background: var(--accent2);
+    border-radius: 2px;
+    animation: wave 0.8s ease-in-out infinite;
+  }
+
+  .wave-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+  .wave-bar:nth-child(2) { height: 14px; animation-delay: 0.1s; }
+  .wave-bar:nth-child(3) { height: 10px; animation-delay: 0.2s; }
+  .wave-bar:nth-child(4) { height: 16px; animation-delay: 0.15s; }
+  .wave-bar:nth-child(5) { height: 8px; animation-delay: 0.05s; }
+
+  @keyframes wave {
+    0%,100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.4); }
+  }
+
+  /* Q&A */
+  .chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+    min-height: 100px;
+  }
+
+  .chat-msg {
+    max-width: 90%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .chat-msg.user {
+    align-self: flex-end;
+    background: var(--accent);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+
+  .chat-msg.assistant {
+    align-self: flex-start;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+    color: var(--text);
+  }
+
+  .chat-msg.assistant .msg-source {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent2);
+    margin-top: 6px;
+  }
+
+  .chat-input-row {
+    display: flex;
+    gap: 8px;
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    padding: 12px 16px;
+    background: rgba(10,10,15,0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+  }
+
+  /* Loading */
+  .loading-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 0;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .empty-icon { font-size: 32px; margin-bottom: 12px; }
+
+  /* Schedule badge */
+  .schedule-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  .schedule-time {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .schedule-desc {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .toggle {
+    width: 42px; height: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.on { background: var(--accent); border-color: var(--accent); }
+
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+    transition: transform 0.2s;
+  }
+
+  .toggle.on::after { transform: translateX(18px); }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  .info-box {
+    background: rgba(124,106,247,0.08);
+    border: 1px solid rgba(124,106,247,0.2);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 12px;
+  }
+
+  .info-box strong { color: var(--accent); }
+
+  .context-papers {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 8px 12px;
+    background: var(--surface);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+
+  /* API key section */
+  .api-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">arXiv<span>Reader</span></div>
+    <div class="status-dot" id="statusDot"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('search')">SEARCH</button>
+    <button class="tab" onclick="switchTab('qa')">Q&amp;A</button>
+    <button class="tab" onclick="switchTab('settings')">SETTINGS</button>
+  </div>
+
+  <!-- SEARCH TAB -->
+  <div class="panel active" id="tab-search">
+    <div class="speaking-bar" id="speakingBar">
+      <div class="wave">
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+        <div class="wave-bar"></div>
+      </div>
+      <span id="speakingLabel">読み上げ中...</span>
+      <button class="btn small danger" onclick="stopSpeech()" style="margin-left:auto">停止</button>
+    </div>
+
+    <div class="section-label">キーワード検索</div>
+    <div class="input-row">
+      <input type="text" id="searchInput" placeholder="例: tidal deformability" onkeydown="if(event.key==='Enter')doSearch()">
+      <button class="btn" onclick="doSearch()">検索</button>
+    </div>
+
+    <div id="searchStatus"></div>
+    <div id="resultsList"></div>
+  </div>
+
+  <!-- Q&A TAB -->
+  <div class="panel" id="tab-qa">
+    <div class="context-papers" id="contextInfo">コンテキスト：論文未選択（検索して論文をQAコンテキストに追加してください）</div>
+    <div class="chat-container" id="chatContainer">
+      <div class="empty-state">
+        <div class="empty-icon">🔭</div>
+        論文を検索・選択してから<br>ここで質問できます
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="qaInput" placeholder="論文について質問..." onkeydown="if(event.key==='Enter')sendQuestion()">
+      <button class="btn" onclick="sendQuestion()">送信</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="panel" id="tab-settings">
+    <div class="section-label">Claude API キー</div>
+    <div class="api-section">
+      <div class="input-row">
+        <input type="text" id="apiKeyInput" placeholder="sk-ant-..." style="font-size:11px">
+        <button class="btn secondary small" onclick="saveApiKey()">保存</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim)">このデバイスのみに保存されます。外部には送信されません。</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">登録キーワード</div>
+    <div class="input-row">
+      <input type="text" id="kwInput" placeholder="キーワードを追加" onkeydown="if(event.key==='Enter')addKeyword()">
+      <button class="btn" onclick="addKeyword()">追加</button>
+    </div>
+    <div class="keyword-list" id="keywordList"></div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">最大取得件数</div>
+    <div class="input-row" style="margin-bottom:0">
+      <input type="text" id="maxResults" value="5" style="width:60px;flex:none">
+      <span style="font-size:12px;color:var(--text-dim);padding-top:11px">件（推奨：3〜10）</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">自動読み上げ</div>
+    <div class="info-box">
+      <strong>スケジュール実行について：</strong><br>
+      AndroidのMacrodroid（無料）またはTaskerを使って、毎朝5時・毎晩0時にこのページを開き自動検索できます。設定手順はこちら→<br><br>
+      1. MacrodroidをPlayストアからインストール<br>
+      2. 「マクロ追加」→「トリガー：時刻」で5:00を設定<br>
+      3. 「アクション：URLを開く」でこのページのURLを指定<br>
+      4. 同じマクロに「検索ボタンをタップ」を追加
+    </div>
+
+    <div class="schedule-item">
+      <div>
+        <div class="schedule-time">05:00</div>
+        <div class="schedule-desc">朝の自動検索（Macrodroid設定後に有効）</div>
+      </div>
+      <div class="toggle" id="toggle5" onclick="toggleSchedule(this)"></div>
+    </div>
+
+    <div class="schedule-item">
+      <div>
+        <div class="schedule-time">00:00</div>
+        <div class="schedule-desc">夜の自動検索（Macrodroid設定後に有効）</div>
+      </div>
+      <div class="toggle" id="toggle0" onclick="toggleSchedule(this)"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">読み上げ設定</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span style="font-size:12px;color:var(--text-dim)">速度</span>
+      <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1.0" style="flex:1">
+      <span id="rateLabel" style="font-family:var(--mono);font-size:12px;color:var(--accent);width:30px">1.0</span>
+    </div>
+
+    <button class="btn secondary" onclick="testSpeech()" style="width:100%">🔊 読み上げテスト</button>
+  </div>
+</div>
+
+<script>
+// ---- State ----
+let keywords = JSON.parse(localStorage.getItem('arxiv_keywords') || '["tidal deformability", "neutron star EOS"]');
+let apiKey = localStorage.getItem('arxiv_apikey') || '';
+let contextPapers = [];
+let chatHistory = [];
+let currentUtterance = null;
+
+// ---- Init ----
+function init() {
+  document.getElementById('apiKeyInput').value = apiKey;
+  renderKeywords();
+  document.getElementById('maxResults').value = localStorage.getItem('arxiv_maxresults') || '5';
+  document.getElementById('speechRate').oninput = function() {
+    document.getElementById('rateLabel').textContent = parseFloat(this.value).toFixed(1);
+  };
+
+  // Auto-search if URL param
+  const params = new URLSearchParams(location.search);
+  if (params.get('auto') === '1') {
+    setTimeout(doSearch, 500);
+  }
+}
+
+// ---- Tabs ----
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['search','qa','settings'][i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ---- Keywords ----
+function addKeyword() {
+  const v = document.getElementById('kwInput').value.trim();
+  if (v && !keywords.includes(v)) {
+    keywords.push(v);
+    saveKeywords();
+    renderKeywords();
+  }
+  document.getElementById('kwInput').value = '';
+}
+
+function removeKeyword(kw) {
+  keywords = keywords.filter(k => k !== kw);
+  saveKeywords();
+  renderKeywords();
+}
+
+function saveKeywords() {
+  localStorage.setItem('arxiv_keywords', JSON.stringify(keywords));
+}
+
+function renderKeywords() {
+  const el = document.getElementById('keywordList');
+  el.innerHTML = keywords.map(kw =>
+    `<div class="keyword-tag">${kw}<span class="remove" onclick="removeKeyword('${kw.replace(/'/g,"\\'")}')">×</span></div>`
+  ).join('');
+}
+
+function saveApiKey() {
+  apiKey = document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem('arxiv_apikey', apiKey);
+  showToast('APIキーを保存しました');
+}
+
+// ---- arXiv Search ----
+async function doSearch() {
+  const customQuery = document.getElementById('searchInput').value.trim();
+  const terms = customQuery ? [customQuery] : keywords;
+  if (!terms.length) {
+    showStatus('キーワードを入力するか、設定で登録してください', 'warn');
+    return;
+  }
+
+  const maxR = parseInt(document.getElementById('maxResults').value) || 5;
+  const query = terms.map(t => `all:${encodeURIComponent(t)}`).join('+AND+');
+  const url = `https://export.arxiv.org/api/query?search_query=${query}&start=0&max_results=${maxR}&sortBy=submittedDate&sortOrder=descending`;
+
+  setDot('loading');
+  showStatus('<div class="loading-row"><div class="spinner"></div>検索中...</div>');
+  document.getElementById('resultsList').innerHTML = '';
+
+  try {
+    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    const xml = new DOMParser().parseFromString(data.contents, 'application/xml');
+    const entries = Array.from(xml.querySelectorAll('entry'));
+
+    if (!entries.length) {
+      showStatus('');
+      document.getElementById('resultsList').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div>該当論文なし</div>';
+      setDot('');
+      return;
+    }
+
+    showStatus('');
+    setDot('active');
+    renderResults(entries);
+
+    // Auto-read first abstract if auto mode
+    const params = new URLSearchParams(location.search);
+    if (params.get('auto') === '1') {
+      setTimeout(() => readAbstract(0), 800);
+    }
+  } catch(e) {
+    showStatus(`<span style="color:var(--danger)">エラー: ${e.message}</span>`);
+    setDot('');
+  }
+}
+
+let papers = [];
+
+function renderResults(entries) {
+  papers = entries.map(e => ({
+    title: e.querySelector('title')?.textContent?.trim() || '',
+    authors: Array.from(e.querySelectorAll('author name')).slice(0,3).map(a=>a.textContent).join(', '),
+    abstract: e.querySelector('summary')?.textContent?.trim() || '',
+    published: e.querySelector('published')?.textContent?.slice(0,10) || '',
+    id: e.querySelector('id')?.textContent || '',
+    categories: Array.from(e.querySelectorAll('category')).map(c=>c.getAttribute('term')||'').slice(0,2)
+  }));
+
+  const list = document.getElementById('resultsList');
+  list.innerHTML = papers.map((p,i) => `
+    <div class="result-card" id="card-${i}" onclick="toggleCard(${i})">
+      <div class="card-meta">
+        ${p.categories.map(c=>`<span class="tag">${c}</span>`).join('')}
+        <span class="date-tag">${p.published}</span>
+      </div>
+      <div class="card-title">${p.title}</div>
+      <div class="card-authors">${p.authors}</div>
+      <div class="card-abstract" id="abstract-${i}">${p.abstract}</div>
+      <div class="card-actions">
+        <button class="btn small" onclick="event.stopPropagation();readAbstract(${i})">🔊 読む</button>
+        <button class="btn small secondary" onclick="event.stopPropagation();addToContext(${i})">QAに追加</button>
+        <button class="btn small secondary" onclick="event.stopPropagation();window.open('${p.id}','_blank')">arXiv</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleCard(i) {
+  const ab = document.getElementById(`abstract-${i}`);
+  ab.classList.toggle('expanded');
+}
+
+// ---- TTS ----
+function readAbstract(idx) {
+  const p = papers[idx];
+  if (!p) return;
+  stopSpeech();
+
+  const rate = parseFloat(document.getElementById('speechRate').value);
+  const text = `Title: ${p.title}. Abstract: ${p.abstract}`;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'en-US';
+  utterance.rate = rate;
+
+  const bar = document.getElementById('speakingBar');
+  const label = document.getElementById('speakingLabel');
+  bar.classList.add('visible');
+  label.textContent = `読み上げ中: ${p.title.slice(0,30)}...`;
+
+  utterance.onend = () => {
+    bar.classList.remove('visible');
+    currentUtterance = null;
+  };
+
+  currentUtterance = utterance;
+  speechSynthesis.speak(utterance);
+}
+
+function stopSpeech() {
+  speechSynthesis.cancel();
+  document.getElementById('speakingBar').classList.remove('visible');
+  currentUtterance = null;
+}
+
+function testSpeech() {
+  stopSpeech();
+  const u = new SpeechSynthesisUtterance('This is a test of the arXiv reader. Speed check.');
+  u.lang = 'en-US';
+  u.rate = parseFloat(document.getElementById('speechRate').value);
+  speechSynthesis.speak(u);
+}
+
+// ---- Context & Q&A ----
+function addToContext(idx) {
+  const p = papers[idx];
+  if (contextPapers.find(cp => cp.id === p.id)) {
+    showToast('既に追加済みです');
+    return;
+  }
+  contextPapers.push(p);
+  document.getElementById(`card-${idx}`).classList.add('selected');
+  updateContextInfo();
+  showToast(`"${p.title.slice(0,30)}..." をQAに追加`);
+}
+
+function updateContextInfo() {
+  const el = document.getElementById('contextInfo');
+  if (!contextPapers.length) {
+    el.textContent = 'コンテキスト：論文未選択';
+  } else {
+    el.textContent = `コンテキスト：${contextPapers.length}件の論文 | ${contextPapers.map(p=>p.title.slice(0,20)+'…').join('、')}`;
+  }
+}
+
+async function sendQuestion() {
+  const q = document.getElementById('qaInput').value.trim();
+  if (!q) return;
+  if (!apiKey) {
+    showToast('設定タブでClaude APIキーを入力してください');
+    switchTab('settings');
+    return;
+  }
+
+  document.getElementById('qaInput').value = '';
+  appendChat('user', q);
+
+  const contextText = contextPapers.length
+    ? contextPapers.map((p,i) =>
+        `[Paper ${i+1}] Title: ${p.title}\nAuthors: ${p.authors}\nPublished: ${p.published}\nAbstract: ${p.abstract}`
+      ).join('\n\n---\n\n')
+    : '(No papers selected as context)';
+
+  const systemPrompt = `You are a helpful research assistant specializing in gravitational wave physics and neutron star astrophysics. 
+Answer questions based on the provided paper abstracts. When relevant, cite specific papers by title.
+If the answer requires knowledge beyond the provided abstracts, say so clearly and suggest related references.
+Be concise but technically precise. Respond in the same language as the user's question.
+
+Context papers:
+${contextText}`;
+
+  chatHistory.push({ role: 'user', content: q });
+
+  const thinkingEl = appendChat('assistant', '...');
+  setDot('loading');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: chatHistory
+      })
+    });
+
+    const data = await res.json();
+    const answer = data.content?.[0]?.text || 'エラーが発生しました';
+    thinkingEl.textContent = answer;
+    chatHistory.push({ role: 'assistant', content: answer });
+    setDot('active');
+
+    // Auto-read answer
+    const u = new SpeechSynthesisUtterance(answer);
+    u.lang = document.documentElement.lang === 'ja' ? 'ja-JP' : 'en-US';
+    u.rate = parseFloat(document.getElementById('speechRate').value);
+    // Don't auto-read Q&A answer, let user decide
+
+  } catch(e) {
+    thinkingEl.textContent = `エラー: ${e.message}`;
+    setDot('');
+  }
+}
+
+function appendChat(role, text) {
+  const container = document.getElementById('chatContainer');
+  if (container.querySelector('.empty-state')) container.innerHTML = '';
+  const div = document.createElement('div');
+  div.className = `chat-msg ${role}`;
+  div.textContent = text;
+  container.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth' });
+  return div;
+}
+
+// ---- Schedule toggles ----
+function toggleSchedule(el) {
+  el.classList.toggle('on');
+}
+
+// ---- UI helpers ----
+function showStatus(html) {
+  document.getElementById('searchStatus').innerHTML = html;
+}
+
+function setDot(state) {
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot' + (state ? ' ' + state : '');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--surface2);border:1px solid var(--border);padding:10px 18px;border-radius:8px;font-family:var(--mono);font-size:12px;z-index:9999;color:var(--accent2);white-space:nowrap`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ---- Start ----
+init();
+</script>
+</body>
+</html>
