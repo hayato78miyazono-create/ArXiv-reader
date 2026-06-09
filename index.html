@@ -483,6 +483,32 @@
 
   .info-box strong { color: var(--accent); }
 
+  /* Range filter */
+  .range-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+
+  .range-btn {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 8px 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .range-btn.active {
+    background: rgba(124,106,247,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
   .context-papers {
     font-family: var(--mono);
     font-size: 10px;
@@ -534,6 +560,13 @@
     <div class="input-row">
       <input type="text" id="searchInput" placeholder="例: tidal deformability" onkeydown="if(event.key==='Enter')doSearch()">
       <button class="btn" onclick="doSearch()">検索</button>
+    </div>
+
+    <div class="range-row" id="rangeRow">
+      <button class="range-btn" data-range="month" onclick="setRange('month')">1か月</button>
+      <button class="range-btn active" data-range="year" onclick="setRange('year')">1年</button>
+      <button class="range-btn" data-range="3year" onclick="setRange('3year')">3年</button>
+      <button class="range-btn" data-range="all" onclick="setRange('all')">全期間</button>
     </div>
 
     <div id="searchStatus"></div>
@@ -691,32 +724,94 @@ function saveApiKey() {
   showToast('APIキーを保存しました');
 }
 
+// ---- Date range ----
+let currentRange = 'year';
+
+function setRange(r) {
+  currentRange = r;
+  document.querySelectorAll('.range-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === r);
+  });
+}
+
+function buildDateClause() {
+  if (currentRange === 'all') return '';
+  const now = new Date();
+  const start = new Date(now);
+  if (currentRange === 'month') start.setMonth(start.getMonth() - 1);
+  else if (currentRange === 'year') start.setFullYear(start.getFullYear() - 1);
+  else if (currentRange === '3year') start.setFullYear(start.getFullYear() - 3);
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+  return ` AND submittedDate:[${ymd(start)}0000 TO ${ymd(now)}2359]`;
+}
+
+// ---- Proxy chain ----
+// arXiv API does not send CORS headers, so a relay is required.
+// We try several relays in order; if one is down, the next is used.
+function proxify(targetUrl) {
+  const enc = encodeURIComponent(targetUrl);
+  return [
+    `https://corsproxy.io/?url=${enc}`,
+    `https://api.allorigins.win/raw?url=${enc}`,
+    `https://api.codetabs.com/v1/proxy/?quest=${enc}`,
+    `https://thingproxy.freeboard.io/fetch/${targetUrl}`
+  ];
+}
+
+async function fetchViaProxies(targetUrl) {
+  const proxies = proxify(targetUrl);
+  let lastErr = null;
+  for (const purl of proxies) {
+    try {
+      const res = await fetch(purl, { headers: { 'Accept': 'application/atom+xml, application/xml, text/xml' } });
+      if (!res.ok) { lastErr = new Error('HTTP ' + res.status); continue; }
+      const text = await res.text();
+      if (text && text.includes('<entry') || (text && text.includes('<feed'))) {
+        return text;
+      }
+      // feed with zero results still has <feed>; accept it
+      if (text && text.includes('opensearch:totalResults')) return text;
+      lastErr = new Error('予期しない応答');
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('全ての中継サーバーに接続できませんでした');
+}
+
 // ---- arXiv Search ----
 async function doSearch() {
   const customQuery = document.getElementById('searchInput').value.trim();
   const terms = customQuery ? [customQuery] : keywords;
   if (!terms.length) {
-    showStatus('キーワードを入力するか、設定で登録してください', 'warn');
+    showStatus('<span style="color:var(--danger)">キーワードを入力するか、設定で登録してください</span>');
     return;
   }
 
   const maxR = parseInt(document.getElementById('maxResults').value) || 5;
-  const query = terms.map(t => `all:${encodeURIComponent(t)}`).join('+AND+');
-  const url = `https://export.arxiv.org/api/query?search_query=${query}&start=0&max_results=${maxR}&sortBy=submittedDate&sortOrder=descending`;
+  // Quote multi-word terms so they are treated as phrases.
+  const termClause = terms.map(t => {
+    const q = t.includes(' ') ? `"${t}"` : t;
+    return `all:${q}`;
+  }).join(' AND ');
+  const searchQuery = termClause + buildDateClause();
+  const url = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(searchQuery)}&start=0&max_results=${maxR}&sortBy=submittedDate&sortOrder=descending`;
 
   setDot('loading');
   showStatus('<div class="loading-row"><div class="spinner"></div>検索中...</div>');
   document.getElementById('resultsList').innerHTML = '';
 
   try {
-    const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    const data = await res.json();
-    const xml = new DOMParser().parseFromString(data.contents, 'application/xml');
-    const entries = Array.from(xml.querySelectorAll('entry'));
+    const xmlText = await fetchViaProxies(url);
+    const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
+    const entries = Array.from(xml.getElementsByTagName('entry'));
 
     if (!entries.length) {
       showStatus('');
-      document.getElementById('resultsList').innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div>該当論文なし</div>';
+      const rangeLabel = { month:'1か月', year:'1年', '3year':'3年', all:'全期間' }[currentRange];
+      document.getElementById('resultsList').innerHTML =
+        `<div class="empty-state"><div class="empty-icon">📭</div>該当論文なし（期間: ${rangeLabel}）<br>期間を広げるか、キーワードを変えてみてください</div>`;
       setDot('');
       return;
     }
@@ -725,13 +820,12 @@ async function doSearch() {
     setDot('active');
     renderResults(entries);
 
-    // Auto-read first abstract if auto mode
     const params = new URLSearchParams(location.search);
     if (params.get('auto') === '1') {
       setTimeout(() => readAbstract(0), 800);
     }
   } catch(e) {
-    showStatus(`<span style="color:var(--danger)">エラー: ${e.message}</span>`);
+    showStatus(`<span style="color:var(--danger)">エラー: ${e.message}<br>少し待って再検索するか、期間を変えてみてください</span>`);
     setDot('');
   }
 }
@@ -739,14 +833,27 @@ async function doSearch() {
 let papers = [];
 
 function renderResults(entries) {
-  papers = entries.map(e => ({
-    title: e.querySelector('title')?.textContent?.trim() || '',
-    authors: Array.from(e.querySelectorAll('author name')).slice(0,3).map(a=>a.textContent).join(', '),
-    abstract: e.querySelector('summary')?.textContent?.trim() || '',
-    published: e.querySelector('published')?.textContent?.slice(0,10) || '',
-    id: e.querySelector('id')?.textContent || '',
-    categories: Array.from(e.querySelectorAll('category')).map(c=>c.getAttribute('term')||'').slice(0,2)
-  }));
+  const tag = (e, name) => {
+    const els = e.getElementsByTagName(name);
+    return els.length ? els[0].textContent.trim() : '';
+  };
+  papers = entries.map(e => {
+    const authorEls = Array.from(e.getElementsByTagName('author'));
+    const authors = authorEls.map(a => {
+      const n = a.getElementsByTagName('name');
+      return n.length ? n[0].textContent : '';
+    }).filter(Boolean).slice(0, 3).join(', ');
+    const cats = Array.from(e.getElementsByTagName('category'))
+      .map(c => c.getAttribute('term') || '').filter(Boolean).slice(0, 2);
+    return {
+      title: tag(e, 'title').replace(/\s+/g, ' '),
+      authors: authors + (authorEls.length > 3 ? ' et al.' : ''),
+      abstract: tag(e, 'summary').replace(/\s+/g, ' '),
+      published: tag(e, 'published').slice(0, 10),
+      id: tag(e, 'id'),
+      categories: cats
+    };
+  });
 
   const list = document.getElementById('resultsList');
   list.innerHTML = papers.map((p,i) => `
