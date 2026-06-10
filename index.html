@@ -806,10 +806,14 @@
       <div class="np-authors" id="npAuthors"></div>
       <div class="np-abstract" id="npAbstract"></div>
       <div class="radio-controls">
+        <button class="btn secondary" onclick="radioPrev()">◀◀ 前</button>
         <button class="btn secondary" onclick="stopRadio()">■ 停止</button>
-        <button class="btn" onclick="radioSkip()">▶▶ 次の論文</button>
+        <button class="btn" onclick="radioSkip()">次 ▶▶</button>
       </div>
-      <button class="btn secondary" style="width:100%;margin-top:8px" onclick="showFigureForCurrent()">🖼 図を表示（実験的）</button>
+      <div class="radio-controls" style="margin-top:8px">
+        <button class="btn secondary" onclick="openArxivCurrent()">🔗 arXiv</button>
+        <button class="btn secondary" onclick="showFigureForCurrent()">🖼 図（実験的）</button>
+      </div>
     </div>
   </div>
 
@@ -836,10 +840,14 @@
       <div class="np-authors" id="fNpAuthors"></div>
       <div class="np-abstract" id="fNpAbstract"></div>
       <div class="radio-controls">
+        <button class="btn secondary" onclick="followPrev()">◀◀ 前</button>
         <button class="btn secondary" onclick="stopFollowRadio()">■ 停止</button>
-        <button class="btn" onclick="followSkip()">▶▶ 次の論文</button>
+        <button class="btn" onclick="followSkip()">次 ▶▶</button>
       </div>
-      <button class="btn secondary" style="width:100%;margin-top:8px" onclick="showFigureForFollow()">🖼 図を表示（実験的）</button>
+      <div class="radio-controls" style="margin-top:8px">
+        <button class="btn secondary" onclick="openArxivFollow()">🔗 arXiv</button>
+        <button class="btn secondary" onclick="showFigureForFollow()">🖼 図（実験的）</button>
+      </div>
     </div>
   </div>
 
@@ -1271,6 +1279,18 @@ function radioSkip() {
   playRadioCurrent();
 }
 
+function radioPrev() {
+  if (!radioActive) return;
+  speechSynthesis.cancel();
+  radioIndex = Math.max(0, radioIndex - 1);
+  playRadioCurrent();
+}
+
+function openArxivCurrent() {
+  const p = radioQueue[radioIndex];
+  if (p && p.id) window.open(p.id, '_blank');
+}
+
 function stopRadio() {
   radioActive = false;
   speechSynthesis.cancel();
@@ -1411,17 +1431,56 @@ function toggleFollowRadio() {
   else startFollowRadio();
 }
 
+// Parse "Kyutoku, K" / "Kyutoku" / "Kent Yagi" -> {surname, initial}
+function parseAuthor(name) {
+  let surname, initial = '';
+  if (name.includes(',')) {
+    const parts = name.split(',');
+    surname = parts[0].trim();
+    initial = (parts[1] || '').trim().charAt(0).toUpperCase();
+  } else {
+    const toks = name.trim().split(/\s+/);
+    if (toks.length > 1) { surname = toks[toks.length - 1]; initial = toks[0].charAt(0).toUpperCase(); }
+    else { surname = toks[0]; }
+  }
+  return { surname, initial };
+}
+
+// Does any author of this entry match surname (+ optional initial)?
+function authorMatches(e, surname, initial) {
+  const sl = surname.toLowerCase();
+  const names = Array.from(e.getElementsByTagName('author')).map(a => {
+    const n = a.getElementsByTagName('name');
+    return n.length ? n[0].textContent.trim() : '';
+  });
+  return names.some(full => {
+    const toks = full.toLowerCase().split(/\s+/);
+    const last = toks[toks.length - 1].replace(/[^a-zà-ÿ]/g, '');
+    if (last !== sl) return false;
+    if (!initial) return true;
+    const given = toks[0] || '';
+    return given.charAt(0) === initial.toLowerCase();
+  });
+}
+
 async function aggregateFollow() {
-  const maxPer = 3; // newest papers per author
+  const wantPer = 3;   // newest papers to keep per author
+  const fetchN = 12;   // fetch more, then filter by initial
   const seen = {};
   const merged = [];
   for (const name of following) {
-    const sq = `au:"${name}"` + buildDateClause();
-    const url = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(sq)}&start=0&max_results=${maxPer}&sortBy=submittedDate&sortOrder=descending`;
+    const { surname, initial } = parseAuthor(name);
+    // Broad surname query (reliable); precise filtering done client-side.
+    const surnameQ = surname.includes(' ') ? `"${surname}"` : surname;
+    const sq = `au:${surnameQ}` + buildDateClause();
+    const url = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(sq)}&start=0&max_results=${fetchN}&sortBy=submittedDate&sortOrder=descending`;
     try {
       const xmlText = await fetchViaProxies(url);
       const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
-      Array.from(xml.getElementsByTagName('entry')).forEach(e => {
+      const entries = Array.from(xml.getElementsByTagName('entry'))
+        .filter(e => authorMatches(e, surname, initial))
+        .slice(0, wantPer);
+      entries.forEach(e => {
         const p = parseEntry(e);
         if (p.id && !seen[p.id]) { seen[p.id] = true; p._kw = '@' + name; merged.push(p); }
       });
@@ -1481,6 +1540,18 @@ function followSkip() {
   speechSynthesis.cancel();
   fIndex++;
   playFollowCurrent();
+}
+
+function followPrev() {
+  if (!fActive) return;
+  speechSynthesis.cancel();
+  fIndex = Math.max(0, fIndex - 1);
+  playFollowCurrent();
+}
+
+function openArxivFollow() {
+  const p = fQueue[fIndex];
+  if (p && p.id) window.open(p.id, '_blank');
 }
 
 function stopFollowRadio() {
