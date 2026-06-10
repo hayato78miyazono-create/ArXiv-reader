@@ -647,6 +647,26 @@
     font-size: 12px;
   }
 
+  /* Speech rules */
+  .rule-list { display: flex; flex-direction: column; gap: 6px; }
+  .rule-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .rule-text {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    word-break: break-all;
+  }
+  .rule-text code { color: var(--accent2); }
+
   /* Figure modal */
   .figure-modal {
     display: none;
@@ -932,6 +952,22 @@
     </div>
 
     <button class="btn secondary" onclick="testSpeech()" style="width:100%">🔊 読み上げテスト</button>
+
+    <div class="divider"></div>
+
+    <div class="section-label">数式の読み上げルール</div>
+    <div class="info-box">
+      <strong>$ \mathcal{} ^{} _ </strong> やギリシャ文字は自動で自然な発音に変換します（例: <strong>$\lambda$</strong>→ラムダ、<strong>z_min</strong>→「z min」、<strong>^{10/3}</strong>→「to the 10 over 3」）。<br>
+      独自の置換を足したいときは「元の文字列 → 読み」を登録してください（組み込み変換より優先されます）。
+    </div>
+    <div class="input-row" style="margin-bottom:6px">
+      <input type="text" id="ruleFrom" placeholder="元 (例: \mathcal{M})" style="font-size:11px">
+      <input type="text" id="ruleTo" placeholder="読み (例: chirp mass)" style="font-size:11px">
+    </div>
+    <button class="btn small" onclick="addRule()" style="width:100%;margin-bottom:10px">＋ ルールを追加</button>
+    <div class="rule-list" id="ruleList"></div>
+    <button class="btn secondary small" onclick="testRulePreview()" style="width:100%;margin-top:8px">変換プレビュー（読み上げ）</button>
+    <div id="rulePreview" style="font-family:var(--mono);font-size:11px;color:var(--accent2);margin-top:8px;line-height:1.6"></div>
   </div>
 </div>
 
@@ -961,15 +997,145 @@ if (JSON.stringify(keywords) === JSON.stringify(["tidal deformability", "neutron
 }
 let apiKey = localStorage.getItem('arxiv_apikey') || '';
 let following = JSON.parse(localStorage.getItem('arxiv_following') || '[]');
+let speechRules = JSON.parse(localStorage.getItem('arxiv_speechrules') || '[]');
 let contextPapers = [];
 let chatHistory = [];
 let currentUtterance = null;
+
+// ---- Math-aware speech normalization ----
+const GREEK = {
+  alpha:'alpha', beta:'beta', gamma:'gamma', delta:'delta', epsilon:'epsilon',
+  varepsilon:'epsilon', zeta:'zeta', eta:'eta', theta:'theta', vartheta:'theta',
+  iota:'iota', kappa:'kappa', lambda:'lambda', mu:'mew', nu:'new', xi:'ksai',
+  omicron:'omicron', pi:'pie', varpi:'pie', rho:'row', varrho:'row', sigma:'sigma',
+  varsigma:'sigma', tau:'tau', upsilon:'upsilon', phi:'fie', varphi:'fie',
+  chi:'kai', psi:'sigh', omega:'omega',
+  Gamma:'gamma', Delta:'delta', Theta:'theta', Lambda:'lambda', Xi:'ksai',
+  Pi:'pie', Sigma:'sigma', Upsilon:'upsilon', Phi:'fie', Psi:'sigh', Omega:'omega'
+};
+
+function speechify(s) {
+  if (!s) return '';
+  let t = s;
+
+  // 1) User custom rules first (literal, so they override built-ins)
+  for (const r of speechRules) {
+    if (r.from) t = t.split(r.from).join(' ' + r.to + ' ');
+  }
+
+  // 2) Strip math delimiters
+  t = t.replace(/\$\$?/g, ' ').replace(/\\\(|\\\)|\\\[|\\\]/g, ' ');
+
+  // 3) Layout / spacing commands -> remove
+  t = t.replace(/\\(left|right|big|Big|bigg|Bigg|displaystyle|nonumber|quad|qquad|limits)\b/g, ' ');
+  t = t.replace(/\\[,;:!> ]/g, ' ');
+
+  // 4) Fractions and roots
+  t = t.replace(/\\(?:d|t)?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, ' $1 over $2 ');
+  t = t.replace(/\\sqrt\s*\{([^{}]*)\}/g, ' square root of $1 ');
+
+  // 5) Styled letters
+  t = t.replace(/\\mathcal\s*\{([^{}]*)\}/g, ' mathcal $1 ');
+  t = t.replace(/\\(mathbb|mathrm|mathbf|mathit|mathsf|boldsymbol|bm|text|textrm|textbf|operatorname)\s*\{([^{}]*)\}/g, ' $2 ');
+
+  // 6) Accents
+  t = t.replace(/\\hat\s*\{([^{}]*)\}/g, ' $1 hat ').replace(/\\hat\s+([A-Za-z])/g, ' $1 hat ');
+  t = t.replace(/\\(bar|overline)\s*\{([^{}]*)\}/g, ' $2 bar ');
+  t = t.replace(/\\(tilde|widetilde)\s*\{([^{}]*)\}/g, ' $2 tilde ');
+  t = t.replace(/\\(dot|ddot)\s*\{([^{}]*)\}/g, ' $2 dot ');
+  t = t.replace(/\\vec\s*\{([^{}]*)\}/g, ' $1 vector ');
+
+  // 7) Operators & symbols (literal replace)
+  const ops = {
+    '\\times':' times ', '\\cdot':' ', '\\div':' divided by ',
+    '\\approx':' approximately ', '\\simeq':' approximately ', '\\sim':' about ',
+    '\\equiv':' defined as ', '\\coloneqq':' defined as ', '\\coloneq':' defined as ',
+    '\\rightarrow':' to ', '\\longrightarrow':' to ', '\\to':' to ',
+    '\\Rightarrow':' implies ', '\\pm':' plus or minus ', '\\mp':' minus or plus ',
+    '\\leq':' less than or equal to ', '\\geq':' greater than or equal to ',
+    '\\ll':' much less than ', '\\gg':' much greater than ', '\\neq':' not equal to ',
+    '\\partial':' partial ', '\\nabla':' del ', '\\infty':' infinity ',
+    '\\odot':' sun ', '\\oplus':' earth ', '\\langle':' average of ', '\\rangle':' ',
+    '\\sum':' sum ', '\\int':' integral ', '\\prod':' product ',
+    '\\log':' log ', '\\ln':' natural log ', '\\exp':' exp ',
+    '\\sin':' sine ', '\\cos':' cosine ', '\\tan':' tangent '
+  };
+  for (const k in ops) t = t.split(k).join(ops[k]);
+
+  // 8) Greek + remaining backslash commands -> words
+  t = t.replace(/\\([A-Za-z]+)/g, (m, w) => GREEK[w] !== undefined ? ' ' + GREEK[w] + ' ' : ' ' + w + ' ');
+
+  // 9) Superscripts (handle nested fraction as "over")
+  t = t.replace(/\^\s*\{([^{}]*)\}/g, (m, inner) => ' to the ' + inner.replace(/\//g, ' over ') + ' ');
+  t = t.replace(/\^\s*([A-Za-z0-9])/g, ' to the $1 ');
+
+  // 10) Subscripts -> just the text, no "underscore"
+  t = t.replace(/_\s*\{([^{}]*)\}/g, ' $1 ');
+  t = t.replace(/_\s*([A-Za-z0-9]+)/g, ' $1 ');
+
+  // 11) Brackets / ratios
+  t = t.replace(/[<>]/g, ' ');
+  t = t.replace(/\//g, ' over ');
+
+  // 12) Clean up leftovers
+  t = t.replace(/[{}]/g, ' ').replace(/\\/g, ' ');
+  t = t.replace(/\s+/g, ' ').trim();
+  return t;
+}
+
+function escapeHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function saveRules() { localStorage.setItem('arxiv_speechrules', JSON.stringify(speechRules)); }
+
+function renderRules() {
+  const el = document.getElementById('ruleList');
+  if (!el) return;
+  el.innerHTML = speechRules.length
+    ? speechRules.map((r,i) => `
+      <div class="rule-item">
+        <span class="rule-text"><code>${escapeHtml(r.from)}</code> → ${escapeHtml(r.to) || '(削除)'}</span>
+        <button class="btn small danger" onclick="removeRule(${i})">×</button>
+      </div>`).join('')
+    : '<div style="font-size:11px;color:var(--text-dim)">カスタムルールなし（組み込み変換のみ）</div>';
+}
+
+function addRule() {
+  const from = document.getElementById('ruleFrom').value.trim();
+  const to = document.getElementById('ruleTo').value.trim();
+  if (!from) return;
+  speechRules.push({ from, to });
+  saveRules();
+  renderRules();
+  document.getElementById('ruleFrom').value = '';
+  document.getElementById('ruleTo').value = '';
+  showToast('ルールを追加しました');
+}
+
+function removeRule(i) {
+  speechRules.splice(i, 1);
+  saveRules();
+  renderRules();
+}
+
+function testRulePreview() {
+  const sample = '$\\langle \\mathcal{M}^{10/3} \\rangle / \\langle \\mathcal{M}^{5/3} \\rangle$, z_min, $\\lambda_2$, $M_\\odot$';
+  const out = speechify(sample);
+  document.getElementById('rulePreview').textContent = '「' + out + '」';
+  const u = new SpeechSynthesisUtterance(out);
+  u.lang = 'en-US';
+  u.rate = parseFloat(document.getElementById('speechRate').value);
+  speechSynthesis.cancel();
+  speechSynthesis.speak(u);
+}
 
 // ---- Init ----
 function init() {
   document.getElementById('apiKeyInput').value = apiKey;
   renderKeywords();
   renderFollowList();
+  renderRules();
   document.getElementById('maxResults').value = localStorage.getItem('arxiv_maxresults') || '5';
   document.getElementById('speechRate').oninput = function() {
     document.getElementById('rateLabel').textContent = parseFloat(this.value).toFixed(1);
@@ -1262,7 +1428,7 @@ function playRadioCurrent() {
 
   speechSynthesis.cancel();
   const rate = parseFloat(document.getElementById('speechRate').value);
-  const text = `Paper ${radioIndex+1} of ${radioQueue.length}. ${p.title}. By ${p.authors}. ${p.abstract}`;
+  const text = `Paper ${radioIndex+1} of ${radioQueue.length}. ${speechify(p.title)}. By ${p.authors}. ${speechify(p.abstract)}`;
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'en-US';
   u.rate = rate;
@@ -1528,7 +1694,7 @@ function playFollowCurrent() {
 
   speechSynthesis.cancel();
   const rate = parseFloat(document.getElementById('speechRate').value);
-  const u = new SpeechSynthesisUtterance(`Paper ${fIndex+1} of ${fQueue.length}. ${p.title}. By ${p.authors}. ${p.abstract}`);
+  const u = new SpeechSynthesisUtterance(`Paper ${fIndex+1} of ${fQueue.length}. ${speechify(p.title)}. By ${p.authors}. ${speechify(p.abstract)}`);
   u.lang = 'en-US';
   u.rate = rate;
   u.onend = () => { if (fActive) { fIndex++; playFollowCurrent(); } };
@@ -1582,7 +1748,7 @@ function readAbstract(idx) {
   stopSpeech();
 
   const rate = parseFloat(document.getElementById('speechRate').value);
-  const text = `Title: ${p.title}. Authors: ${p.authors}. Abstract: ${p.abstract}`;
+  const text = `Title: ${speechify(p.title)}. Authors: ${p.authors}. Abstract: ${speechify(p.abstract)}`;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
   utterance.rate = rate;
