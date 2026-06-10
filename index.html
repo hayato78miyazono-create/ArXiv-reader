@@ -852,7 +852,8 @@
     <div class="follow-list" id="followList"></div>
 
     <button class="radio-play" id="followPlayBtn" onclick="toggleFollowRadio()" style="margin-top:8px">▶</button>
-    <div style="text-align:center;font-size:11px;color:var(--text-dim);margin-top:8px">フォロー中の著者の新着を読み上げ</div>
+    <div style="text-align:center;font-size:11px;color:var(--text-dim);margin-top:8px">フォロー中の著者の新着を読み上げ<br>（2回目以降はキャッシュで高速）</div>
+    <button class="btn secondary small" onclick="stopFollowRadio();startFollowRadio(true)" style="width:100%;margin-top:10px">🔄 全著者を取得し直す（強制更新）</button>
 
     <div class="now-playing" id="followNowPlaying" style="display:none;margin-top:16px">
       <div class="np-progress" id="fNpProgress"></div>
@@ -968,6 +969,23 @@
     <div class="rule-list" id="ruleList"></div>
     <button class="btn secondary small" onclick="testRulePreview()" style="width:100%;margin-top:8px">変換プレビュー（読み上げ）</button>
     <div id="rulePreview" style="font-family:var(--mono);font-size:11px;color:var(--accent2);margin-top:8px;line-height:1.6"></div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">端末間で設定を移す</div>
+    <div class="info-box">
+      フォロー・キーワード・読み上げルールをまとめて移せます。PCで「書き出し」→コードをコピー→スマホで貼り付けて「読み込み」。
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);margin-bottom:10px;cursor:pointer">
+      <input type="checkbox" id="includeApiKey"> APIキーも含める（共有相手に注意）
+    </label>
+    <button class="btn secondary" onclick="exportSettings()" style="width:100%;margin-bottom:8px">⬆ 書き出し（コードを作る）</button>
+    <textarea id="ioBox" placeholder="ここに書き出しコードが出ます。別端末ではここに貼り付けてから「読み込み」を押してください。"
+      style="width:100%;min-height:90px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:11px;padding:10px;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+    <div class="input-row" style="margin-top:8px">
+      <button class="btn secondary" onclick="copyIoBox()" style="flex:1">📋 コピー</button>
+      <button class="btn" onclick="importSettings()" style="flex:1">⬇ 読み込み</button>
+    </div>
   </div>
 </div>
 
@@ -1130,6 +1148,57 @@ function testRulePreview() {
   speechSynthesis.speak(u);
 }
 
+// ---- Export / Import settings ----
+function exportSettings() {
+  const payload = {
+    v: 1,
+    keywords: keywords,
+    following: following,
+    speechRules: speechRules,
+    maxResults: document.getElementById('maxResults').value,
+    speechRate: document.getElementById('speechRate').value
+  };
+  if (document.getElementById('includeApiKey').checked) payload.apiKey = apiKey;
+  // Base64 so it's a single safe-to-paste blob
+  const code = 'ARXIV1:' + btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  document.getElementById('ioBox').value = code;
+  showToast('書き出しました。コピーして別端末へ');
+}
+
+function importSettings() {
+  let raw = document.getElementById('ioBox').value.trim();
+  if (!raw) { showToast('コードを貼り付けてください'); return; }
+  try {
+    if (raw.startsWith('ARXIV1:')) raw = raw.slice(7);
+    const payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
+    if (Array.isArray(payload.keywords)) { keywords = payload.keywords; localStorage.setItem('arxiv_keywords', JSON.stringify(keywords)); }
+    if (Array.isArray(payload.following)) { following = payload.following; saveFollowing(); }
+    if (Array.isArray(payload.speechRules)) { speechRules = payload.speechRules; saveRules(); }
+    if (payload.maxResults) { localStorage.setItem('arxiv_maxresults', payload.maxResults); document.getElementById('maxResults').value = payload.maxResults; }
+    if (payload.speechRate) { localStorage.setItem('arxiv_speechrate', payload.speechRate); document.getElementById('speechRate').value = payload.speechRate; document.getElementById('rateLabel').textContent = parseFloat(payload.speechRate).toFixed(1); }
+    if (payload.apiKey) { apiKey = payload.apiKey; localStorage.setItem('arxiv_apikey', apiKey); document.getElementById('apiKeyInput').value = apiKey; }
+    renderKeywords();
+    renderFollowList();
+    renderRules();
+    showToast('読み込みました ✓');
+  } catch(e) {
+    showToast('コードが不正です: ' + e.message);
+  }
+}
+
+async function copyIoBox() {
+  const box = document.getElementById('ioBox');
+  if (!box.value) { showToast('先に書き出してください'); return; }
+  try {
+    await navigator.clipboard.writeText(box.value);
+    showToast('コピーしました');
+  } catch(e) {
+    box.select();
+    document.execCommand('copy');
+    showToast('コピーしました');
+  }
+}
+
 // ---- Init ----
 function init() {
   document.getElementById('apiKeyInput').value = apiKey;
@@ -1137,8 +1206,14 @@ function init() {
   renderFollowList();
   renderRules();
   document.getElementById('maxResults').value = localStorage.getItem('arxiv_maxresults') || '5';
+  const savedRate = localStorage.getItem('arxiv_speechrate');
+  if (savedRate) {
+    document.getElementById('speechRate').value = savedRate;
+    document.getElementById('rateLabel').textContent = parseFloat(savedRate).toFixed(1);
+  }
   document.getElementById('speechRate').oninput = function() {
     document.getElementById('rateLabel').textContent = parseFloat(this.value).toFixed(1);
+    localStorage.setItem('arxiv_speechrate', this.value);
   };
 
   // Auto-launch via URL params (for Macrodroid one-tap)
@@ -1219,6 +1294,28 @@ function buildDateClause() {
   const ymd = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
   return ` AND submittedDate:[${ymd(start)}0000 TO ${ymd(now)}2359]`;
 }
+
+// ---- Date / cache helpers (shared) ----
+function _pad(n){ return String(n).padStart(2,'0'); }
+function _ymd(d){ return `${d.getFullYear()}${_pad(d.getMonth()+1)}${_pad(d.getDate())}`; }
+function todayYmd(){ return _ymd(new Date()); }
+function ymdMinusDays(ymdStr, days){
+  const y=+ymdStr.slice(0,4), m=+ymdStr.slice(4,6)-1, d=+ymdStr.slice(6,8);
+  const dt=new Date(y,m,d); dt.setDate(dt.getDate()-days); return _ymd(dt);
+}
+function rangeStartYmd(range){
+  if(range==='all') return null;
+  const now=new Date(); const s=new Date(now);
+  if(range==='month') s.setMonth(s.getMonth()-1);
+  else if(range==='year') s.setFullYear(s.getFullYear()-1);
+  else if(range==='3year') s.setFullYear(s.getFullYear()-3);
+  return _ymd(s);
+}
+function dateClauseBetween(startYmd){
+  return ` AND submittedDate:[${startYmd}0000 TO ${todayYmd()}2359]`;
+}
+function loadFollowCache(){ try { return JSON.parse(localStorage.getItem('arxiv_followcache')||'{}'); } catch(e){ return {}; } }
+function saveFollowCache(c){ localStorage.setItem('arxiv_followcache', JSON.stringify(c)); }
 
 // ---- Proxy chain ----
 // arXiv API does not send CORS headers, so a relay is required.
@@ -1585,6 +1682,8 @@ function addFollow() {
 function removeFollow(name) {
   following = following.filter(f => f !== name);
   saveFollowing();
+  const cache = loadFollowCache();
+  if (cache[name]) { delete cache[name]; saveFollowCache(cache); }
   renderFollowList();
 }
 
@@ -1629,46 +1728,81 @@ function authorMatches(e, surname, initial) {
   });
 }
 
-async function aggregateFollow() {
-  const wantPer = 3;   // newest papers to keep per author
-  const fetchN = 12;   // fetch more, then filter by initial
-  const seen = {};
+async function aggregateFollow(forceRefresh) {
+  const wantPer = 3;   // newest papers per author to put in the play queue
+  const fetchN = 25;
+  const cache = loadFollowCache();
+  const curRange = currentRange;
+  const startYmd = rangeStartYmd(curRange); // null for 'all'
   const merged = [];
+  const seenGlobal = {};
+
   for (const name of following) {
     const { surname, initial } = parseAuthor(name);
-    // Broad surname query (reliable); precise filtering done client-side.
+    let entry = cache[name];
+
+    // Decide: full fetch or incremental?
+    let fetchStartYmd;
+    if (forceRefresh || !entry || entry.range !== curRange) {
+      // New author, range changed, or forced -> full fetch over the window
+      fetchStartYmd = startYmd; // null if 'all'
+      entry = { range: curRange, lastCheck: todayYmd(), papers: [] };
+    } else {
+      // Incremental: only papers since last check (back-dated 3 days for late indexing)
+      fetchStartYmd = ymdMinusDays(entry.lastCheck || todayYmd(), 3);
+    }
+
     const surnameQ = surname.includes(' ') ? `"${surname}"` : surname;
-    const sq = `au:${surnameQ}` + buildDateClause();
+    const dateClause = (curRange === 'all' && !fetchStartYmd) ? '' : dateClauseBetween(fetchStartYmd || startYmd || '19910101');
+    const sq = `au:${surnameQ}` + dateClause;
     const url = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(sq)}&start=0&max_results=${fetchN}&sortBy=submittedDate&sortOrder=descending`;
+
+    let fetched = [];
     try {
       const xmlText = await fetchViaProxies(url);
       const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
-      const entries = Array.from(xml.getElementsByTagName('entry'))
+      fetched = Array.from(xml.getElementsByTagName('entry'))
         .filter(e => authorMatches(e, surname, initial))
-        .slice(0, wantPer);
-      entries.forEach(e => {
-        const p = parseEntry(e);
-        if (p.id && !seen[p.id]) { seen[p.id] = true; p._kw = '@' + name; merged.push(p); }
-      });
-    } catch(e) { /* skip this author */ }
+        .map(parseEntry);
+    } catch(e) { /* network failed: fall back to whatever is cached */ }
+
+    // Merge fetched into cached papers (dedupe by id)
+    const byId = {};
+    (entry.papers || []).forEach(p => { if (p.id) byId[p.id] = p; });
+    fetched.forEach(p => { if (p.id) byId[p.id] = p; });
+    let all = Object.values(byId);
+    // Keep only papers inside the current range window
+    if (startYmd) all = all.filter(p => (p.published || '').replace(/-/g,'') >= startYmd);
+    all.sort((a,b) => (b.published||'').localeCompare(a.published||''));
+
+    entry.papers = all.slice(0, 60);
+    entry.lastCheck = todayYmd();
+    entry.range = curRange;
+    cache[name] = entry;
+
+    all.slice(0, wantPer).forEach(p => {
+      if (p.id && !seenGlobal[p.id]) { seenGlobal[p.id] = true; merged.push({ ...p, _kw: '@' + name }); }
+    });
   }
+
+  saveFollowCache(cache);
   merged.sort((a,b) => (b.published||'').localeCompare(a.published||''));
   return merged;
 }
 
-async function startFollowRadio() {
+async function startFollowRadio(forceRefresh) {
   if (!following.length) { showToast('先に著者をフォローしてください'); return; }
   stopRadio(); // don't let both radios play at once
   fActive = true;
   setDot('loading');
   document.getElementById('followPlayBtn').textContent = '…';
   document.getElementById('followNowPlaying').style.display = 'block';
-  document.getElementById('fNpProgress').textContent = '新着を集めています...';
+  document.getElementById('fNpProgress').textContent = forceRefresh ? '全著者を取得し直しています...' : '新着を確認しています...';
   document.getElementById('fNpTitle').textContent = '';
   document.getElementById('fNpAuthors').textContent = '';
   document.getElementById('fNpAbstract').textContent = '';
 
-  fQueue = await aggregateFollow();
+  fQueue = await aggregateFollow(forceRefresh);
 
   if (!fActive) return;
   if (!fQueue.length) {
