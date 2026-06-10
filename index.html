@@ -91,14 +91,18 @@
   .tabs {
     display: flex;
     border-bottom: 1px solid var(--border);
-    padding: 0 16px;
+    padding: 0 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
   }
+  .tabs::-webkit-scrollbar { display: none; }
 
   .tab {
     font-family: var(--mono);
     font-size: 11px;
-    letter-spacing: 0.08em;
-    padding: 12px 16px 10px;
+    letter-spacing: 0.06em;
+    padding: 12px 12px 10px;
     cursor: pointer;
     color: var(--text-dim);
     border-bottom: 2px solid transparent;
@@ -107,6 +111,7 @@
     border-top: none;
     border-left: none;
     border-right: none;
+    white-space: nowrap;
   }
 
   .tab.active {
@@ -509,6 +514,216 @@
     color: var(--accent);
   }
 
+  /* Radio */
+  .radio-hero {
+    text-align: center;
+    padding: 24px 16px 28px;
+    background: radial-gradient(circle at 50% 0%, rgba(124,106,247,0.12), transparent 70%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 16px;
+  }
+
+  .radio-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    color: var(--accent2);
+    margin-bottom: 6px;
+  }
+
+  .radio-sub {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+
+  .radio-play {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, var(--accent), #5b48d8);
+    color: #fff;
+    font-size: 32px;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(124,106,247,0.4);
+    transition: transform 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 20px;
+  }
+
+  .radio-play:active { transform: scale(0.93); }
+
+  .radio-kw-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  .radio-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .now-playing {
+    background: var(--surface);
+    border: 1px solid var(--accent2);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .np-progress {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent2);
+    margin-bottom: 10px;
+  }
+
+  .np-title {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.5;
+    margin-bottom: 6px;
+  }
+
+  .np-authors {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .np-abstract {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    max-height: 180px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+  }
+
+  .radio-controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  .radio-controls .btn { flex: 1; }
+
+  /* Follow list */
+  .follow-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .follow-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .follow-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent2);
+  }
+
+  .follow-empty {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  /* Figure modal */
+  .figure-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .figure-modal.open { display: flex; }
+
+  .figure-inner {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    max-width: 100%;
+    max-height: 90vh;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .figure-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  .figure-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .figure-body {
+    padding: 14px;
+    overflow: auto;
+    text-align: center;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .figure-body img {
+    max-width: 100%;
+    height: auto;
+    background: #fff;
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .figure-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+  }
+
+  .fig-count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
   .context-papers {
     font-family: var(--mono);
     font-size: 10px;
@@ -538,6 +753,8 @@
 
   <div class="tabs">
     <button class="tab active" onclick="switchTab('search')">SEARCH</button>
+    <button class="tab" onclick="switchTab('radio')">RADIO</button>
+    <button class="tab" onclick="switchTab('follow')">FOLLOW</button>
     <button class="tab" onclick="switchTab('qa')">Q&amp;A</button>
     <button class="tab" onclick="switchTab('settings')">SETTINGS</button>
   </div>
@@ -571,6 +788,59 @@
 
     <div id="searchStatus"></div>
     <div id="resultsList"></div>
+  </div>
+
+  <!-- RADIO TAB -->
+  <div class="panel" id="tab-radio">
+    <div class="radio-hero">
+      <div class="radio-title">DAILY RADIO</div>
+      <div class="radio-sub">登録キーワードの最新論文を順に読み上げます</div>
+      <button class="radio-play" id="radioPlayBtn" onclick="toggleRadio()">▶</button>
+      <div class="radio-kw-label">対象キーワード（設定タブで編集）</div>
+      <div class="radio-keywords" id="radioKeywords"></div>
+    </div>
+
+    <div class="now-playing" id="nowPlaying" style="display:none">
+      <div class="np-progress" id="npProgress"></div>
+      <div class="np-title" id="npTitle"></div>
+      <div class="np-authors" id="npAuthors"></div>
+      <div class="np-abstract" id="npAbstract"></div>
+      <div class="radio-controls">
+        <button class="btn secondary" onclick="stopRadio()">■ 停止</button>
+        <button class="btn" onclick="radioSkip()">▶▶ 次の論文</button>
+      </div>
+      <button class="btn secondary" style="width:100%;margin-top:8px" onclick="showFigureForCurrent()">🖼 図を表示（実験的）</button>
+    </div>
+  </div>
+
+  <!-- FOLLOW TAB -->
+  <div class="panel" id="tab-follow">
+    <div class="section-label">著者をフォロー</div>
+    <div class="input-row">
+      <input type="text" id="followInput" placeholder="例: Kyutoku, K  または  Yagi" onkeydown="if(event.key==='Enter')addFollow()">
+      <button class="btn" onclick="addFollow()">追加</button>
+    </div>
+    <div class="info-box" style="margin-bottom:16px">
+      arXiv形式の <strong>姓, 名</strong>（例: <strong>Kyutoku, K</strong>）が最も正確です。姓だけでも可。同姓同名が混ざる場合はフルネームで絞ってください。
+    </div>
+
+    <div class="section-label">フォロー中</div>
+    <div class="follow-list" id="followList"></div>
+
+    <button class="radio-play" id="followPlayBtn" onclick="toggleFollowRadio()" style="margin-top:8px">▶</button>
+    <div style="text-align:center;font-size:11px;color:var(--text-dim);margin-top:8px">フォロー中の著者の新着を読み上げ</div>
+
+    <div class="now-playing" id="followNowPlaying" style="display:none;margin-top:16px">
+      <div class="np-progress" id="fNpProgress"></div>
+      <div class="np-title" id="fNpTitle"></div>
+      <div class="np-authors" id="fNpAuthors"></div>
+      <div class="np-abstract" id="fNpAbstract"></div>
+      <div class="radio-controls">
+        <button class="btn secondary" onclick="stopFollowRadio()">■ 停止</button>
+        <button class="btn" onclick="followSkip()">▶▶ 次の論文</button>
+      </div>
+      <button class="btn secondary" style="width:100%;margin-top:8px" onclick="showFigureForFollow()">🖼 図を表示（実験的）</button>
+    </div>
   </div>
 
   <!-- Q&A TAB -->
@@ -657,10 +927,32 @@
   </div>
 </div>
 
+<div class="figure-modal" id="figureModal" onclick="closeFigure()">
+  <div class="figure-inner" onclick="event.stopPropagation()">
+    <div class="figure-head">
+      <span id="figureCaption">図</span>
+      <button class="figure-close" onclick="closeFigure()">×</button>
+    </div>
+    <div class="figure-body" id="figureBody"></div>
+    <div class="figure-nav" id="figureNav" style="display:none">
+      <button class="btn secondary small" onclick="figPrev()">‹ 前の図</button>
+      <span class="fig-count" id="figCount"></span>
+      <button class="btn secondary small" onclick="figNext()">次の図 ›</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ---- State ----
-let keywords = JSON.parse(localStorage.getItem('arxiv_keywords') || '["tidal deformability", "neutron star EOS"]');
+const DEFAULT_KEYWORDS = ["tidal deformability", "love number", "neutron star", "gravitational wave"];
+let keywords = JSON.parse(localStorage.getItem('arxiv_keywords') || JSON.stringify(DEFAULT_KEYWORDS));
+// One-time upgrade: migrate the very first default set to the new radio defaults.
+if (JSON.stringify(keywords) === JSON.stringify(["tidal deformability", "neutron star EOS"])) {
+  keywords = DEFAULT_KEYWORDS.slice();
+  localStorage.setItem('arxiv_keywords', JSON.stringify(keywords));
+}
 let apiKey = localStorage.getItem('arxiv_apikey') || '';
+let following = JSON.parse(localStorage.getItem('arxiv_following') || '[]');
 let contextPapers = [];
 let chatHistory = [];
 let currentUtterance = null;
@@ -669,14 +961,21 @@ let currentUtterance = null;
 function init() {
   document.getElementById('apiKeyInput').value = apiKey;
   renderKeywords();
+  renderFollowList();
   document.getElementById('maxResults').value = localStorage.getItem('arxiv_maxresults') || '5';
   document.getElementById('speechRate').oninput = function() {
     document.getElementById('rateLabel').textContent = parseFloat(this.value).toFixed(1);
   };
 
-  // Auto-search if URL param
+  // Auto-launch via URL params (for Macrodroid one-tap)
   const params = new URLSearchParams(location.search);
-  if (params.get('auto') === '1') {
+  if (params.get('radio') === '1') {
+    switchTab('radio');
+    setTimeout(() => { try { startRadio(); } catch(e){} }, 600);
+  } else if (params.get('follow') === '1') {
+    switchTab('follow');
+    setTimeout(() => { try { startFollowRadio(); } catch(e){} }, 600);
+  } else if (params.get('auto') === '1') {
     setTimeout(doSearch, 500);
   }
 }
@@ -684,7 +983,7 @@ function init() {
 // ---- Tabs ----
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', ['search','qa','settings'][i] === name);
+    t.classList.toggle('active', ['search','radio','follow','qa','settings'][i] === name);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
@@ -716,6 +1015,7 @@ function renderKeywords() {
   el.innerHTML = keywords.map(kw =>
     `<div class="keyword-tag">${kw}<span class="remove" onclick="removeKeyword('${kw.replace(/'/g,"\\'")}')">×</span></div>`
   ).join('');
+  renderRadioKeywords();
 }
 
 function saveApiKey() {
@@ -759,19 +1059,16 @@ function proxify(targetUrl) {
   ];
 }
 
-async function fetchViaProxies(targetUrl) {
+async function fetchViaProxies(targetUrl, validate) {
+  validate = validate || (t => t.includes('<entry') || t.includes('<feed') || t.includes('opensearch:totalResults'));
   const proxies = proxify(targetUrl);
   let lastErr = null;
   for (const purl of proxies) {
     try {
-      const res = await fetch(purl, { headers: { 'Accept': 'application/atom+xml, application/xml, text/xml' } });
+      const res = await fetch(purl, { headers: { 'Accept': 'application/atom+xml, application/xml, text/xml, text/html' } });
       if (!res.ok) { lastErr = new Error('HTTP ' + res.status); continue; }
       const text = await res.text();
-      if (text && text.includes('<entry') || (text && text.includes('<feed'))) {
-        return text;
-      }
-      // feed with zero results still has <feed>; accept it
-      if (text && text.includes('opensearch:totalResults')) return text;
+      if (text && validate(text)) return text;
       lastErr = new Error('予期しない応答');
     } catch (e) {
       lastErr = e;
@@ -832,28 +1129,30 @@ async function doSearch() {
 
 let papers = [];
 
-function renderResults(entries) {
-  const tag = (e, name) => {
-    const els = e.getElementsByTagName(name);
+function parseEntry(e) {
+  const tag = (el, name) => {
+    const els = el.getElementsByTagName(name);
     return els.length ? els[0].textContent.trim() : '';
   };
-  papers = entries.map(e => {
-    const authorEls = Array.from(e.getElementsByTagName('author'));
-    const authors = authorEls.map(a => {
-      const n = a.getElementsByTagName('name');
-      return n.length ? n[0].textContent : '';
-    }).filter(Boolean).slice(0, 3).join(', ');
-    const cats = Array.from(e.getElementsByTagName('category'))
-      .map(c => c.getAttribute('term') || '').filter(Boolean).slice(0, 2);
-    return {
-      title: tag(e, 'title').replace(/\s+/g, ' '),
-      authors: authors + (authorEls.length > 3 ? ' et al.' : ''),
-      abstract: tag(e, 'summary').replace(/\s+/g, ' '),
-      published: tag(e, 'published').slice(0, 10),
-      id: tag(e, 'id'),
-      categories: cats
-    };
-  });
+  const authorEls = Array.from(e.getElementsByTagName('author'));
+  const authors = authorEls.map(a => {
+    const n = a.getElementsByTagName('name');
+    return n.length ? n[0].textContent : '';
+  }).filter(Boolean).slice(0, 3).join(', ');
+  const cats = Array.from(e.getElementsByTagName('category'))
+    .map(c => c.getAttribute('term') || '').filter(Boolean).slice(0, 2);
+  return {
+    title: tag(e, 'title').replace(/\s+/g, ' '),
+    authors: authors + (authorEls.length > 3 ? ' et al.' : ''),
+    abstract: tag(e, 'summary').replace(/\s+/g, ' '),
+    published: tag(e, 'published').slice(0, 10),
+    id: tag(e, 'id'),
+    categories: cats
+  };
+}
+
+function renderResults(entries) {
+  papers = entries.map(parseEntry);
 
   const list = document.getElementById('resultsList');
   list.innerHTML = papers.map((p,i) => `
@@ -867,6 +1166,7 @@ function renderResults(entries) {
       <div class="card-abstract" id="abstract-${i}">${p.abstract}</div>
       <div class="card-actions">
         <button class="btn small" onclick="event.stopPropagation();readAbstract(${i})">🔊 読む</button>
+        <button class="btn small secondary" onclick="event.stopPropagation();showFigure(papers[${i}])">🖼 図</button>
         <button class="btn small secondary" onclick="event.stopPropagation();addToContext(${i})">QAに追加</button>
         <button class="btn small secondary" onclick="event.stopPropagation();window.open('${p.id}','_blank')">arXiv</button>
       </div>
@@ -879,6 +1179,331 @@ function toggleCard(i) {
   ab.classList.toggle('expanded');
 }
 
+// ---- Daily Radio ----
+let radioQueue = [];
+let radioIndex = 0;
+let radioActive = false;
+
+function renderRadioKeywords() {
+  const el = document.getElementById('radioKeywords');
+  if (el) el.innerHTML = keywords.map(k => `<span class="keyword-tag">${k}</span>`).join('');
+}
+
+function toggleRadio() {
+  if (radioActive) stopRadio();
+  else startRadio();
+}
+
+async function aggregateSearch() {
+  const maxPer = 3; // papers per keyword
+  const seen = {};
+  const merged = [];
+  for (const kw of keywords) {
+    const q = kw.includes(' ') ? `"${kw}"` : kw;
+    const sq = `all:${q}` + buildDateClause();
+    const url = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(sq)}&start=0&max_results=${maxPer}&sortBy=submittedDate&sortOrder=descending`;
+    try {
+      const xmlText = await fetchViaProxies(url);
+      const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
+      Array.from(xml.getElementsByTagName('entry')).forEach(e => {
+        const p = parseEntry(e);
+        if (p.id && !seen[p.id]) { seen[p.id] = true; p._kw = kw; merged.push(p); }
+      });
+    } catch(e) { /* this keyword failed, continue */ }
+  }
+  merged.sort((a,b) => (b.published||'').localeCompare(a.published||''));
+  return merged;
+}
+
+async function startRadio() {
+  if (!keywords.length) { showToast('設定タブでキーワードを登録してください'); switchTab('settings'); return; }
+  stopFollowRadio(); // don't let both radios play at once
+  radioActive = true;
+  setDot('loading');
+  document.getElementById('radioPlayBtn').textContent = '…';
+  document.getElementById('npProgress').textContent = '論文を集めています...';
+  document.getElementById('nowPlaying').style.display = 'block';
+  document.getElementById('npTitle').textContent = '';
+  document.getElementById('npAuthors').textContent = '';
+  document.getElementById('npAbstract').textContent = '';
+
+  radioQueue = await aggregateSearch();
+
+  if (!radioActive) return; // stopped during fetch
+  if (!radioQueue.length) {
+    showToast('該当論文なし。期間を広げてみてください');
+    stopRadio();
+    return;
+  }
+  radioIndex = 0;
+  setDot('active');
+  document.getElementById('radioPlayBtn').textContent = '⏸';
+  playRadioCurrent();
+}
+
+function playRadioCurrent() {
+  if (!radioActive) return;
+  if (radioIndex >= radioQueue.length) { finishRadio(); return; }
+  const p = radioQueue[radioIndex];
+
+  document.getElementById('npProgress').textContent =
+    `${radioIndex+1} / ${radioQueue.length}　·　${p._kw || ''}　·　${p.published}`;
+  document.getElementById('npTitle').textContent = p.title;
+  document.getElementById('npAuthors').textContent = p.authors;
+  document.getElementById('npAbstract').textContent = p.abstract;
+
+  speechSynthesis.cancel();
+  const rate = parseFloat(document.getElementById('speechRate').value);
+  const text = `Paper ${radioIndex+1} of ${radioQueue.length}. ${p.title}. By ${p.authors}. ${p.abstract}`;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'en-US';
+  u.rate = rate;
+  u.onend = () => {
+    if (radioActive) { radioIndex++; playRadioCurrent(); }
+  };
+  speechSynthesis.speak(u);
+}
+
+function radioSkip() {
+  if (!radioActive) return;
+  speechSynthesis.cancel();
+  radioIndex++;
+  playRadioCurrent();
+}
+
+function stopRadio() {
+  radioActive = false;
+  speechSynthesis.cancel();
+  document.getElementById('radioPlayBtn').textContent = '▶';
+  document.getElementById('nowPlaying').style.display = 'none';
+  setDot('');
+}
+
+function finishRadio() {
+  radioActive = false;
+  speechSynthesis.cancel();
+  document.getElementById('radioPlayBtn').textContent = '▶';
+  document.getElementById('npProgress').textContent = '✓ 完了 — 今日の論文は以上です';
+  setDot('');
+  const u = new SpeechSynthesisUtterance('That is all for today.');
+  u.lang = 'en-US';
+  u.rate = parseFloat(document.getElementById('speechRate').value);
+  speechSynthesis.speak(u);
+}
+
+// ---- Figure popup (experimental, best-effort) ----
+let figList = [];
+let figIndex = 0;
+
+function showFigureForCurrent() {
+  const p = radioQueue[radioIndex];
+  if (p) showFigure(p);
+}
+
+async function showFigure(p) {
+  const m = (p.id || '').match(/(\d{4}\.\d{4,5})/);
+  const modal = document.getElementById('figureModal');
+  const body = document.getElementById('figureBody');
+  const nav = document.getElementById('figureNav');
+  document.getElementById('figureCaption').textContent = p.title.slice(0, 46);
+  nav.style.display = 'none';
+  body.innerHTML = '<div class="loading-row"><div class="spinner"></div>図を探しています...</div>';
+  modal.classList.add('open');
+
+  if (!m) { body.innerHTML = '<div style="color:var(--text-dim);font-size:12px">論文IDを取得できませんでした</div>'; return; }
+  const id = m[1];
+
+  // Try ar5iv (HTML render of arXiv papers); extract figure images.
+  const sources = [
+    { base: 'https://ar5iv.labs.arxiv.org', url: `https://ar5iv.labs.arxiv.org/html/${id}` },
+    { base: `https://arxiv.org`, url: `https://arxiv.org/html/${id}` }
+  ];
+
+  for (const src of sources) {
+    try {
+      const html = await fetchViaProxies(src.url, t => t.includes('<img') || t.includes('<figure') || t.includes('<html'));
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      let imgs = Array.from(doc.querySelectorAll('figure img'));
+      if (!imgs.length) imgs = Array.from(doc.querySelectorAll('img')).filter(im => {
+        const s = im.getAttribute('src') || '';
+        return /\.(png|jpg|jpeg|gif|svg)/i.test(s) && !/logo|icon|orcid|cc-/i.test(s);
+      });
+      const urls = imgs.map(im => {
+        let s = im.getAttribute('src') || '';
+        if (!s) return '';
+        if (s.startsWith('http')) return s;
+        if (s.startsWith('//')) return 'https:' + s;
+        if (s.startsWith('/')) return src.base + s;
+        return src.url.replace(/\/$/, '') + '/' + s;
+      }).filter(Boolean);
+
+      if (urls.length) {
+        figList = urls;
+        figIndex = 0;
+        renderFigure();
+        return;
+      }
+    } catch(e) { /* try next source */ }
+  }
+
+  body.innerHTML = `<div style="color:var(--text-dim);font-size:12px;line-height:1.7">
+    図を自動取得できませんでした。<br>
+    <a href="https://arxiv.org/abs/${id}" target="_blank" style="color:var(--accent2)">arXivで論文を開く →</a>
+  </div>`;
+}
+
+function renderFigure() {
+  const body = document.getElementById('figureBody');
+  const nav = document.getElementById('figureNav');
+  body.innerHTML = `<img src="${figList[figIndex]}" alt="figure" onerror="this.parentNode.innerHTML='<div style=\\'color:var(--text-dim);font-size:12px\\'>画像を読み込めませんでした</div>'">`;
+  if (figList.length > 1) {
+    nav.style.display = 'flex';
+    document.getElementById('figCount').textContent = `${figIndex+1} / ${figList.length}`;
+  } else {
+    nav.style.display = 'none';
+  }
+}
+
+function figNext() { figIndex = (figIndex + 1) % figList.length; renderFigure(); }
+function figPrev() { figIndex = (figIndex - 1 + figList.length) % figList.length; renderFigure(); }
+function closeFigure() { document.getElementById('figureModal').classList.remove('open'); }
+
+// ---- Author Following ----
+function saveFollowing() { localStorage.setItem('arxiv_following', JSON.stringify(following)); }
+
+function renderFollowList() {
+  const el = document.getElementById('followList');
+  if (!el) return;
+  if (!following.length) {
+    el.innerHTML = '<div class="follow-empty">まだ誰もフォローしていません</div>';
+    return;
+  }
+  el.innerHTML = following.map(name => `
+    <div class="follow-item">
+      <span class="follow-name">@ ${name}</span>
+      <button class="btn small danger" onclick="removeFollow('${name.replace(/'/g,"\\'")}')">解除</button>
+    </div>`).join('');
+}
+
+function addFollow() {
+  const v = document.getElementById('followInput').value.trim();
+  if (v && !following.includes(v)) {
+    following.push(v);
+    saveFollowing();
+    renderFollowList();
+    showToast(`@${v} をフォローしました`);
+  }
+  document.getElementById('followInput').value = '';
+}
+
+function removeFollow(name) {
+  following = following.filter(f => f !== name);
+  saveFollowing();
+  renderFollowList();
+}
+
+let fQueue = [];
+let fIndex = 0;
+let fActive = false;
+
+function toggleFollowRadio() {
+  if (fActive) stopFollowRadio();
+  else startFollowRadio();
+}
+
+async function aggregateFollow() {
+  const maxPer = 3; // newest papers per author
+  const seen = {};
+  const merged = [];
+  for (const name of following) {
+    const sq = `au:"${name}"` + buildDateClause();
+    const url = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent(sq)}&start=0&max_results=${maxPer}&sortBy=submittedDate&sortOrder=descending`;
+    try {
+      const xmlText = await fetchViaProxies(url);
+      const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
+      Array.from(xml.getElementsByTagName('entry')).forEach(e => {
+        const p = parseEntry(e);
+        if (p.id && !seen[p.id]) { seen[p.id] = true; p._kw = '@' + name; merged.push(p); }
+      });
+    } catch(e) { /* skip this author */ }
+  }
+  merged.sort((a,b) => (b.published||'').localeCompare(a.published||''));
+  return merged;
+}
+
+async function startFollowRadio() {
+  if (!following.length) { showToast('先に著者をフォローしてください'); return; }
+  stopRadio(); // don't let both radios play at once
+  fActive = true;
+  setDot('loading');
+  document.getElementById('followPlayBtn').textContent = '…';
+  document.getElementById('followNowPlaying').style.display = 'block';
+  document.getElementById('fNpProgress').textContent = '新着を集めています...';
+  document.getElementById('fNpTitle').textContent = '';
+  document.getElementById('fNpAuthors').textContent = '';
+  document.getElementById('fNpAbstract').textContent = '';
+
+  fQueue = await aggregateFollow();
+
+  if (!fActive) return;
+  if (!fQueue.length) {
+    showToast('新着なし。期間を広げてみてください');
+    stopFollowRadio();
+    return;
+  }
+  fIndex = 0;
+  setDot('active');
+  document.getElementById('followPlayBtn').textContent = '⏸';
+  playFollowCurrent();
+}
+
+function playFollowCurrent() {
+  if (!fActive) return;
+  if (fIndex >= fQueue.length) { finishFollowRadio(); return; }
+  const p = fQueue[fIndex];
+  document.getElementById('fNpProgress').textContent =
+    `${fIndex+1} / ${fQueue.length}　·　${p._kw || ''}　·　${p.published}`;
+  document.getElementById('fNpTitle').textContent = p.title;
+  document.getElementById('fNpAuthors').textContent = p.authors;
+  document.getElementById('fNpAbstract').textContent = p.abstract;
+
+  speechSynthesis.cancel();
+  const rate = parseFloat(document.getElementById('speechRate').value);
+  const u = new SpeechSynthesisUtterance(`Paper ${fIndex+1} of ${fQueue.length}. ${p.title}. By ${p.authors}. ${p.abstract}`);
+  u.lang = 'en-US';
+  u.rate = rate;
+  u.onend = () => { if (fActive) { fIndex++; playFollowCurrent(); } };
+  speechSynthesis.speak(u);
+}
+
+function followSkip() {
+  if (!fActive) return;
+  speechSynthesis.cancel();
+  fIndex++;
+  playFollowCurrent();
+}
+
+function stopFollowRadio() {
+  fActive = false;
+  speechSynthesis.cancel();
+  document.getElementById('followPlayBtn').textContent = '▶';
+  document.getElementById('followNowPlaying').style.display = 'none';
+  setDot('');
+}
+
+function finishFollowRadio() {
+  fActive = false;
+  speechSynthesis.cancel();
+  document.getElementById('followPlayBtn').textContent = '▶';
+  document.getElementById('fNpProgress').textContent = '✓ 完了 — 新着は以上です';
+  setDot('');
+}
+
+function showFigureForFollow() {
+  const p = fQueue[fIndex];
+  if (p) showFigure(p);
+}
+
 // ---- TTS ----
 function readAbstract(idx) {
   const p = papers[idx];
@@ -886,7 +1511,7 @@ function readAbstract(idx) {
   stopSpeech();
 
   const rate = parseFloat(document.getElementById('speechRate').value);
-  const text = `Title: ${p.title}. Abstract: ${p.abstract}`;
+  const text = `Title: ${p.title}. Authors: ${p.authors}. Abstract: ${p.abstract}`;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'en-US';
   utterance.rate = rate;
