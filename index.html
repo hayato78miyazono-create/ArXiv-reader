@@ -16,7 +16,9 @@
     --accent: #7c6af7;
     --accent2: #4ecdc4;
     --text: #e8e8f0;
-    --text-dim: #7070a0;
+    --text-dim: #8a8ab0;
+    --text-body: #cdcdd8;
+    --abstract-size: 13px;
     --danger: #f74c6a;
     --success: #4ecdc4;
     --mono: 'Space Mono', monospace;
@@ -250,9 +252,9 @@
   }
 
   .card-abstract {
-    font-size: 12px;
-    color: var(--text-dim);
-    line-height: 1.6;
+    font-size: var(--abstract-size);
+    color: var(--text-body);
+    line-height: 1.65;
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
@@ -600,10 +602,10 @@
   }
 
   .np-abstract {
-    font-size: 12px;
-    color: var(--text-dim);
-    line-height: 1.6;
-    max-height: 180px;
+    font-size: var(--abstract-size);
+    color: var(--text-body);
+    line-height: 1.65;
+    max-height: 200px;
     overflow-y: auto;
     margin-bottom: 14px;
   }
@@ -827,7 +829,7 @@
       <div class="np-abstract" id="npAbstract"></div>
       <div class="radio-controls">
         <button class="btn secondary" onclick="radioPrev()">◀◀ 前</button>
-        <button class="btn secondary" onclick="stopRadio()">■ 停止</button>
+        <button class="btn secondary" id="radioPauseBtn" onclick="pauseToggleRadio()">⏸ 一時停止</button>
         <button class="btn" onclick="radioSkip()">次 ▶▶</button>
       </div>
       <div class="radio-controls" style="margin-top:8px">
@@ -862,7 +864,7 @@
       <div class="np-abstract" id="fNpAbstract"></div>
       <div class="radio-controls">
         <button class="btn secondary" onclick="followPrev()">◀◀ 前</button>
-        <button class="btn secondary" onclick="stopFollowRadio()">■ 停止</button>
+        <button class="btn secondary" id="followPauseBtn" onclick="pauseToggleFollow()">⏸ 一時停止</button>
         <button class="btn" onclick="followSkip()">次 ▶▶</button>
       </div>
       <div class="radio-controls" style="margin-top:8px">
@@ -947,9 +949,14 @@
 
     <div class="section-label">読み上げ設定</div>
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-      <span style="font-size:12px;color:var(--text-dim)">速度</span>
+      <span style="font-size:12px;color:var(--text-dim);width:48px">速度</span>
       <input type="range" id="speechRate" min="0.5" max="2" step="0.1" value="1.0" style="flex:1">
       <span id="rateLabel" style="font-family:var(--mono);font-size:12px;color:var(--accent);width:30px">1.0</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+      <span style="font-size:12px;color:var(--text-dim);width:48px">文字サイズ</span>
+      <input type="range" id="fontSize" min="11" max="20" step="1" value="13" style="flex:1">
+      <span id="fontLabel" style="font-family:var(--mono);font-size:12px;color:var(--accent);width:30px">13</span>
     </div>
 
     <button class="btn secondary" onclick="testSpeech()" style="width:100%">🔊 読み上げテスト</button>
@@ -1105,6 +1112,10 @@ function escapeHtml(s) {
   return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function applyFontSize(px) {
+  document.documentElement.style.setProperty('--abstract-size', px + 'px');
+}
+
 function saveRules() { localStorage.setItem('arxiv_speechrules', JSON.stringify(speechRules)); }
 
 function renderRules() {
@@ -1156,7 +1167,8 @@ function exportSettings() {
     following: following,
     speechRules: speechRules,
     maxResults: document.getElementById('maxResults').value,
-    speechRate: document.getElementById('speechRate').value
+    speechRate: document.getElementById('speechRate').value,
+    fontSize: document.getElementById('fontSize').value
   };
   if (document.getElementById('includeApiKey').checked) payload.apiKey = apiKey;
   // Base64 so it's a single safe-to-paste blob
@@ -1176,6 +1188,7 @@ function importSettings() {
     if (Array.isArray(payload.speechRules)) { speechRules = payload.speechRules; saveRules(); }
     if (payload.maxResults) { localStorage.setItem('arxiv_maxresults', payload.maxResults); document.getElementById('maxResults').value = payload.maxResults; }
     if (payload.speechRate) { localStorage.setItem('arxiv_speechrate', payload.speechRate); document.getElementById('speechRate').value = payload.speechRate; document.getElementById('rateLabel').textContent = parseFloat(payload.speechRate).toFixed(1); }
+    if (payload.fontSize) { localStorage.setItem('arxiv_fontsize', payload.fontSize); document.getElementById('fontSize').value = payload.fontSize; document.getElementById('fontLabel').textContent = payload.fontSize; applyFontSize(payload.fontSize); }
     if (payload.apiKey) { apiKey = payload.apiKey; localStorage.setItem('arxiv_apikey', apiKey); document.getElementById('apiKeyInput').value = apiKey; }
     renderKeywords();
     renderFollowList();
@@ -1214,6 +1227,16 @@ function init() {
   document.getElementById('speechRate').oninput = function() {
     document.getElementById('rateLabel').textContent = parseFloat(this.value).toFixed(1);
     localStorage.setItem('arxiv_speechrate', this.value);
+  };
+
+  const savedFont = localStorage.getItem('arxiv_fontsize') || '13';
+  applyFontSize(savedFont);
+  document.getElementById('fontSize').value = savedFont;
+  document.getElementById('fontLabel').textContent = savedFont;
+  document.getElementById('fontSize').oninput = function() {
+    applyFontSize(this.value);
+    document.getElementById('fontLabel').textContent = this.value;
+    localStorage.setItem('arxiv_fontsize', this.value);
   };
 
   // Auto-launch via URL params (for Macrodroid one-tap)
@@ -1409,12 +1432,12 @@ function parseEntry(e) {
   const authors = authorEls.map(a => {
     const n = a.getElementsByTagName('name');
     return n.length ? n[0].textContent : '';
-  }).filter(Boolean).slice(0, 3).join(', ');
+  }).filter(Boolean).slice(0, 10).join(', ');
   const cats = Array.from(e.getElementsByTagName('category'))
     .map(c => c.getAttribute('term') || '').filter(Boolean).slice(0, 2);
   return {
     title: tag(e, 'title').replace(/\s+/g, ' '),
-    authors: authors + (authorEls.length > 3 ? ' et al.' : ''),
+    authors: authors + (authorEls.length > 10 ? ' et al.' : ''),
     abstract: tag(e, 'summary').replace(/\s+/g, ' '),
     published: tag(e, 'published').slice(0, 10),
     id: tag(e, 'id'),
@@ -1454,6 +1477,7 @@ function toggleCard(i) {
 let radioQueue = [];
 let radioIndex = 0;
 let radioActive = false;
+let radioPaused = false;
 
 function renderRadioKeywords() {
   const el = document.getElementById('radioKeywords');
@@ -1461,8 +1485,27 @@ function renderRadioKeywords() {
 }
 
 function toggleRadio() {
-  if (radioActive) stopRadio();
-  else startRadio();
+  if (!radioActive) startRadio();
+  else pauseToggleRadio();
+}
+
+function pauseToggleRadio() {
+  if (!radioActive) return;
+  const pb = document.getElementById('radioPauseBtn');
+  const big = document.getElementById('radioPlayBtn');
+  if (radioPaused) {
+    speechSynthesis.resume();
+    radioPaused = false;
+    if (pb) pb.textContent = '⏸ 一時停止';
+    big.textContent = '⏸';
+    setDot('active');
+  } else {
+    speechSynthesis.pause();
+    radioPaused = true;
+    if (pb) pb.textContent = '▶ 再開';
+    big.textContent = '▶';
+    setDot('');
+  }
 }
 
 async function aggregateSearch() {
@@ -1516,6 +1559,12 @@ function playRadioCurrent() {
   if (!radioActive) return;
   if (radioIndex >= radioQueue.length) { finishRadio(); return; }
   const p = radioQueue[radioIndex];
+
+  radioPaused = false;
+  const pb = document.getElementById('radioPauseBtn');
+  if (pb) pb.textContent = '⏸ 一時停止';
+  document.getElementById('radioPlayBtn').textContent = '⏸';
+  setDot('active');
 
   document.getElementById('npProgress').textContent =
     `${radioIndex+1} / ${radioQueue.length}　·　${p._kw || ''}　·　${p.published}`;
@@ -1690,10 +1739,30 @@ function removeFollow(name) {
 let fQueue = [];
 let fIndex = 0;
 let fActive = false;
+let fPaused = false;
 
 function toggleFollowRadio() {
-  if (fActive) stopFollowRadio();
-  else startFollowRadio();
+  if (!fActive) startFollowRadio();
+  else pauseToggleFollow();
+}
+
+function pauseToggleFollow() {
+  if (!fActive) return;
+  const pb = document.getElementById('followPauseBtn');
+  const big = document.getElementById('followPlayBtn');
+  if (fPaused) {
+    speechSynthesis.resume();
+    fPaused = false;
+    if (pb) pb.textContent = '⏸ 一時停止';
+    if (big) big.textContent = '⏸';
+    setDot('active');
+  } else {
+    speechSynthesis.pause();
+    fPaused = true;
+    if (pb) pb.textContent = '▶ 再開';
+    if (big) big.textContent = '▶';
+    setDot('');
+  }
 }
 
 // Parse "Kyutoku, K" / "Kyutoku" / "Kent Yagi" -> {surname, initial}
@@ -1820,6 +1889,13 @@ function playFollowCurrent() {
   if (!fActive) return;
   if (fIndex >= fQueue.length) { finishFollowRadio(); return; }
   const p = fQueue[fIndex];
+
+  fPaused = false;
+  const pb = document.getElementById('followPauseBtn');
+  if (pb) pb.textContent = '⏸ 一時停止';
+  document.getElementById('followPlayBtn').textContent = '⏸';
+  setDot('active');
+
   document.getElementById('fNpProgress').textContent =
     `${fIndex+1} / ${fQueue.length}　·　${p._kw || ''}　·　${p.published}`;
   document.getElementById('fNpTitle').textContent = p.title;
@@ -1941,8 +2017,9 @@ async function sendQuestion() {
   const q = document.getElementById('qaInput').value.trim();
   if (!q) return;
   if (!apiKey) {
-    showToast('設定タブでClaude APIキーを入力してください');
-    switchTab('settings');
+    // Don't yank the user away or discard their question — explain inline.
+    appendChat('assistant', 'Q&Aを使うにはClaude APIキーが必要です。SETTINGSタブの「Claude APIキー」に入力して「保存」を押すと、ここで質問できるようになります。（入力した質問は消していません）');
+    showToast('APIキー未設定 — SETTINGSで保存してください');
     return;
   }
 
