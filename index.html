@@ -669,6 +669,52 @@
   }
   .rule-text code { color: var(--accent2); }
 
+  /* Reading list */
+  .reading-list { display: flex; flex-direction: column; gap: 8px; }
+  .reading-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+  }
+  .reading-item.playing { border-color: var(--accent2); }
+  .reading-main { flex: 1; min-width: 0; cursor: pointer; }
+  .reading-title {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.45;
+    margin-bottom: 4px;
+  }
+  .reading-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .reading-del {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 4px;
+  }
+  .reading-del:hover { color: var(--danger); }
+  .reading-empty {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
   /* Figure modal */
   .figure-modal {
     display: none;
@@ -777,6 +823,7 @@
     <button class="tab active" onclick="switchTab('search')">SEARCH</button>
     <button class="tab" onclick="switchTab('radio')">RADIO</button>
     <button class="tab" onclick="switchTab('follow')">FOLLOW</button>
+    <button class="tab" onclick="switchTab('reading')">積ん読</button>
     <button class="tab" onclick="switchTab('qa')">Q&amp;A</button>
     <button class="tab" onclick="switchTab('settings')">SETTINGS</button>
   </div>
@@ -834,7 +881,8 @@
       </div>
       <div class="radio-controls" style="margin-top:8px">
         <button class="btn secondary" onclick="openArxivCurrent()">🔗 arXiv</button>
-        <button class="btn secondary" onclick="showFigureForCurrent()">🖼 図（実験的）</button>
+        <button class="btn secondary" onclick="addReadingPaper(radioQueue[radioIndex])">＋積ん読</button>
+        <button class="btn secondary" onclick="showFigureForCurrent()">🖼 図</button>
       </div>
     </div>
   </div>
@@ -869,9 +917,44 @@
       </div>
       <div class="radio-controls" style="margin-top:8px">
         <button class="btn secondary" onclick="openArxivFollow()">🔗 arXiv</button>
-        <button class="btn secondary" onclick="showFigureForFollow()">🖼 図（実験的）</button>
+        <button class="btn secondary" onclick="addReadingPaper(fQueue[fIndex])">＋積ん読</button>
+        <button class="btn secondary" onclick="showFigureForFollow()">🖼 図</button>
       </div>
     </div>
+  </div>
+
+  <!-- READING (積ん読) TAB -->
+  <div class="panel" id="tab-reading">
+    <div class="section-label">論文を登録</div>
+    <div class="input-row">
+      <input type="text" id="readingInput" placeholder="arXiv番号 / URL / タイトル" onkeydown="if(event.key==='Enter')addReadingFromInput()">
+      <button class="btn" onclick="addReadingFromInput()">追加</button>
+    </div>
+    <div class="info-box" style="margin-bottom:16px">
+      <strong>arXiv番号</strong>（例: 2506.12345）や <strong>URL</strong> を入れると、論文情報を取得して登録します。<strong>タイトル</strong>でもOK（最も一致する論文を登録）。検索結果・ラジオの「＋積ん読」からも貯められます。
+    </div>
+
+    <button class="radio-play" id="readingPlayBtn" onclick="toggleReadingRadio()" style="margin-top:4px">▶</button>
+    <div style="text-align:center;font-size:11px;color:var(--text-dim);margin-top:8px">積ん読をラジオのように読み上げ</div>
+
+    <div class="now-playing" id="readingNowPlaying" style="display:none;margin-top:16px">
+      <div class="np-progress" id="rNpProgress"></div>
+      <div class="np-title" id="rNpTitle"></div>
+      <div class="np-authors" id="rNpAuthors"></div>
+      <div class="np-abstract" id="rNpAbstract"></div>
+      <div class="radio-controls">
+        <button class="btn secondary" onclick="readingPrev()">◀◀ 前</button>
+        <button class="btn secondary" id="readingPauseBtn" onclick="pauseToggleReading()">⏸ 一時停止</button>
+        <button class="btn" onclick="readingSkip()">次 ▶▶</button>
+      </div>
+      <div class="radio-controls" style="margin-top:8px">
+        <button class="btn secondary" onclick="openArxivReading()">🔗 arXiv</button>
+        <button class="btn secondary" onclick="showFigureForReading()">🖼 図（実験的）</button>
+      </div>
+    </div>
+
+    <div class="section-label" style="margin-top:20px">登録した論文 <span id="readingCount" style="color:var(--text-dim)"></span></div>
+    <div class="reading-list" id="readingList"></div>
   </div>
 
   <!-- Q&A TAB -->
@@ -1022,6 +1105,7 @@ if (JSON.stringify(keywords) === JSON.stringify(["tidal deformability", "neutron
 }
 let apiKey = localStorage.getItem('arxiv_apikey') || '';
 let following = JSON.parse(localStorage.getItem('arxiv_following') || '[]');
+let reading = JSON.parse(localStorage.getItem('arxiv_reading') || '[]');
 let speechRules = JSON.parse(localStorage.getItem('arxiv_speechrules') || '[]');
 let contextPapers = [];
 let chatHistory = [];
@@ -1165,6 +1249,7 @@ function exportSettings() {
     v: 1,
     keywords: keywords,
     following: following,
+    reading: reading,
     speechRules: speechRules,
     maxResults: document.getElementById('maxResults').value,
     speechRate: document.getElementById('speechRate').value,
@@ -1185,6 +1270,7 @@ function importSettings() {
     const payload = JSON.parse(decodeURIComponent(escape(atob(raw))));
     if (Array.isArray(payload.keywords)) { keywords = payload.keywords; localStorage.setItem('arxiv_keywords', JSON.stringify(keywords)); }
     if (Array.isArray(payload.following)) { following = payload.following; saveFollowing(); }
+    if (Array.isArray(payload.reading)) { reading = payload.reading; saveReading(); }
     if (Array.isArray(payload.speechRules)) { speechRules = payload.speechRules; saveRules(); }
     if (payload.maxResults) { localStorage.setItem('arxiv_maxresults', payload.maxResults); document.getElementById('maxResults').value = payload.maxResults; }
     if (payload.speechRate) { localStorage.setItem('arxiv_speechrate', payload.speechRate); document.getElementById('speechRate').value = payload.speechRate; document.getElementById('rateLabel').textContent = parseFloat(payload.speechRate).toFixed(1); }
@@ -1192,6 +1278,7 @@ function importSettings() {
     if (payload.apiKey) { apiKey = payload.apiKey; localStorage.setItem('arxiv_apikey', apiKey); document.getElementById('apiKeyInput').value = apiKey; }
     renderKeywords();
     renderFollowList();
+    renderReadingList();
     renderRules();
     showToast('読み込みました ✓');
   } catch(e) {
@@ -1217,6 +1304,7 @@ function init() {
   document.getElementById('apiKeyInput').value = apiKey;
   renderKeywords();
   renderFollowList();
+  renderReadingList();
   renderRules();
   document.getElementById('maxResults').value = localStorage.getItem('arxiv_maxresults') || '5';
   const savedRate = localStorage.getItem('arxiv_speechrate');
@@ -1247,6 +1335,9 @@ function init() {
   } else if (params.get('follow') === '1') {
     switchTab('follow');
     setTimeout(() => { try { startFollowRadio(); } catch(e){} }, 600);
+  } else if (params.get('reading') === '1') {
+    switchTab('reading');
+    setTimeout(() => { try { startReadingRadio(); } catch(e){} }, 600);
   } else if (params.get('auto') === '1') {
     setTimeout(doSearch, 500);
   }
@@ -1255,7 +1346,7 @@ function init() {
 // ---- Tabs ----
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach((t,i) => {
-    t.classList.toggle('active', ['search','radio','follow','qa','settings'][i] === name);
+    t.classList.toggle('active', ['search','radio','follow','reading','qa','settings'][i] === name);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
@@ -1462,6 +1553,7 @@ function renderResults(entries) {
         <button class="btn small" onclick="event.stopPropagation();readAbstract(${i})">🔊 読む</button>
         <button class="btn small secondary" onclick="event.stopPropagation();showFigure(papers[${i}])">🖼 図</button>
         <button class="btn small secondary" onclick="event.stopPropagation();addToContext(${i})">QAに追加</button>
+        <button class="btn small secondary" onclick="event.stopPropagation();addReadingPaper(papers[${i}])">＋積ん読</button>
         <button class="btn small secondary" onclick="event.stopPropagation();window.open('${p.id}','_blank')">arXiv</button>
       </div>
     </div>
@@ -1532,6 +1624,7 @@ async function aggregateSearch() {
 async function startRadio() {
   if (!keywords.length) { showToast('設定タブでキーワードを登録してください'); switchTab('settings'); return; }
   stopFollowRadio(); // don't let both radios play at once
+  stopReadingRadio();
   radioActive = true;
   setDot('loading');
   document.getElementById('radioPlayBtn').textContent = '…';
@@ -1862,6 +1955,7 @@ async function aggregateFollow(forceRefresh) {
 async function startFollowRadio(forceRefresh) {
   if (!following.length) { showToast('先に著者をフォローしてください'); return; }
   stopRadio(); // don't let both radios play at once
+  stopReadingRadio();
   fActive = true;
   setDot('loading');
   document.getElementById('followPlayBtn').textContent = '…';
@@ -1949,6 +2043,171 @@ function finishFollowRadio() {
 function showFigureForFollow() {
   const p = fQueue[fIndex];
   if (p) showFigure(p);
+}
+
+// ---- Reading list (積ん読) ----
+function saveReading() { localStorage.setItem('arxiv_reading', JSON.stringify(reading)); }
+
+function extractArxivId(s) {
+  const m = s.match(/(\d{4}\.\d{4,5})(v\d+)?/);
+  return m ? m[1] : null;
+}
+
+async function resolvePaper(input) {
+  const id = extractArxivId(input);
+  let url;
+  if (id) {
+    url = `https://export.arxiv.org/api/query?id_list=${id}`;
+  } else {
+    url = `https://export.arxiv.org/api/query?search_query=${encodeURIComponent('ti:"' + input + '"')}&max_results=1`;
+  }
+  const xmlText = await fetchViaProxies(url);
+  const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
+  const e = xml.getElementsByTagName('entry')[0];
+  return e ? parseEntry(e) : null;
+}
+
+async function addReadingFromInput() {
+  const v = document.getElementById('readingInput').value.trim();
+  if (!v) return;
+  document.getElementById('readingInput').value = '';
+  showToast('論文を取得中...');
+  setDot('loading');
+  try {
+    const p = await resolvePaper(v);
+    setDot('');
+    if (!p) { showToast('論文が見つかりませんでした'); return; }
+    addReadingPaper(p);
+  } catch(e) { setDot(''); showToast('取得に失敗: ' + e.message); }
+}
+
+function addReadingPaper(p) {
+  if (!p || !p.id) return;
+  if (reading.find(r => r.id === p.id)) { showToast('登録済みです'); return; }
+  reading.unshift({ id: p.id, title: p.title, authors: p.authors, abstract: p.abstract, published: p.published, added: Date.now() });
+  saveReading();
+  renderReadingList();
+  showToast('積ん読に追加しました');
+}
+
+function removeReading(i) { reading.splice(i, 1); saveReading(); renderReadingList(); }
+function openReadingArxiv(i) { const r = reading[i]; if (r && r.id) window.open(r.id, '_blank'); }
+
+function renderReadingList() {
+  const el = document.getElementById('readingList');
+  const cnt = document.getElementById('readingCount');
+  if (cnt) cnt.textContent = reading.length ? `(${reading.length})` : '';
+  if (!el) return;
+  if (!reading.length) {
+    el.innerHTML = '<div class="reading-empty">積ん読は空です。<br>arXiv番号やタイトルで登録、または検索結果の「＋積ん読」から追加してください。</div>';
+    return;
+  }
+  el.innerHTML = reading.map((r,i) => `
+    <div class="reading-item" id="reading-${i}">
+      <div class="reading-main" onclick="openReadingArxiv(${i})">
+        <div class="reading-title">${escapeHtml(r.title)}</div>
+        <div class="reading-meta">${escapeHtml(r.authors||'')} · ${r.published||''}</div>
+      </div>
+      <button class="reading-del" onclick="removeReading(${i})">×</button>
+    </div>`).join('');
+}
+
+// ---- Reading radio ----
+let rQueue = [];
+let rIndex = 0;
+let rActive = false;
+let rPaused = false;
+
+function toggleReadingRadio() {
+  if (!rActive) startReadingRadio();
+  else pauseToggleReading();
+}
+
+function pauseToggleReading() {
+  if (!rActive) return;
+  const pb = document.getElementById('readingPauseBtn');
+  const big = document.getElementById('readingPlayBtn');
+  if (rPaused) {
+    speechSynthesis.resume();
+    rPaused = false;
+    if (pb) pb.textContent = '⏸ 一時停止';
+    if (big) big.textContent = '⏸';
+    setDot('active');
+  } else {
+    speechSynthesis.pause();
+    rPaused = true;
+    if (pb) pb.textContent = '▶ 再開';
+    if (big) big.textContent = '▶';
+    setDot('');
+  }
+}
+
+function startReadingRadio() {
+  if (!reading.length) { showToast('積ん読が空です'); return; }
+  stopRadio();
+  stopFollowRadio();
+  rActive = true;
+  rQueue = reading.slice();
+  rIndex = 0;
+  document.getElementById('readingNowPlaying').style.display = 'block';
+  document.getElementById('readingPlayBtn').textContent = '⏸';
+  setDot('active');
+  playReadingCurrent();
+}
+
+function playReadingCurrent() {
+  if (!rActive) return;
+  if (rIndex >= rQueue.length) { finishReadingRadio(); return; }
+  const p = rQueue[rIndex];
+
+  rPaused = false;
+  const pb = document.getElementById('readingPauseBtn');
+  if (pb) pb.textContent = '⏸ 一時停止';
+  document.getElementById('readingPlayBtn').textContent = '⏸';
+  setDot('active');
+
+  document.getElementById('rNpProgress').textContent = `${rIndex+1} / ${rQueue.length}　·　${p.published||''}`;
+  document.getElementById('rNpTitle').textContent = p.title;
+  document.getElementById('rNpAuthors').textContent = p.authors;
+  document.getElementById('rNpAbstract').textContent = p.abstract;
+
+  // highlight in list
+  document.querySelectorAll('.reading-item').forEach(el => el.classList.remove('playing'));
+  const li = document.getElementById('reading-' + rIndex);
+  if (li) li.classList.add('playing');
+
+  speechSynthesis.cancel();
+  const rate = parseFloat(document.getElementById('speechRate').value);
+  const u = new SpeechSynthesisUtterance(`Paper ${rIndex+1} of ${rQueue.length}. ${speechify(p.title)}. By ${p.authors}. ${speechify(p.abstract)}`);
+  u.lang = 'en-US';
+  u.rate = rate;
+  u.onend = () => { if (rActive) { rIndex++; playReadingCurrent(); } };
+  speechSynthesis.speak(u);
+}
+
+function readingSkip() { if (!rActive) return; speechSynthesis.cancel(); rIndex++; playReadingCurrent(); }
+function readingPrev() { if (!rActive) return; speechSynthesis.cancel(); rIndex = Math.max(0, rIndex - 1); playReadingCurrent(); }
+function openArxivReading() { const p = rQueue[rIndex]; if (p && p.id) window.open(p.id, '_blank'); }
+function showFigureForReading() { const p = rQueue[rIndex]; if (p) showFigure(p); }
+
+function stopReadingRadio() {
+  rActive = false;
+  speechSynthesis.cancel();
+  const big = document.getElementById('readingPlayBtn');
+  if (big) big.textContent = '▶';
+  const np = document.getElementById('readingNowPlaying');
+  if (np) np.style.display = 'none';
+  document.querySelectorAll('.reading-item').forEach(el => el.classList.remove('playing'));
+  setDot('');
+}
+
+function finishReadingRadio() {
+  rActive = false;
+  speechSynthesis.cancel();
+  document.getElementById('readingPlayBtn').textContent = '▶';
+  document.getElementById('rNpProgress').textContent = '✓ 完了 — 積ん読は以上です';
+  document.querySelectorAll('.reading-item').forEach(el => el.classList.remove('playing'));
+  setDot('');
 }
 
 // ---- TTS ----
